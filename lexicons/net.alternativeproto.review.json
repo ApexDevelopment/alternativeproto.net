@@ -1,0 +1,48 @@
+{
+	"lexicon": 1,
+	"id": "net.alternativeproto.review",
+	"defs": {
+		"main": {
+			"type": "record",
+			"description": "A user review of an ATProto Alternatives project (alternativeproto.net).",
+			"key": "tid",
+			"record": {
+				"type": "object",
+				"required": [
+					"projectId",
+					"rating",
+					"text",
+					"isGoodAlternative",
+					"createdAt"
+				],
+				"properties": {
+					"projectId": {
+						"type": "string",
+						"description": "The project ID being reviewed (matches id field from project data)"
+					},
+					"rating": {
+						"type": "integer",
+						"minimum": 1,
+						"maximum": 5,
+						"description": "Rating value from 1-5 stars"
+					},
+					"text": {
+						"type": "string",
+						"maxLength": 3000,
+						"maxGraphemes": 1000,
+						"description": "The review text describing thoughts on the project"
+					},
+					"isGoodAlternative": {
+						"type": "boolean",
+						"description": "Hidden field: whether the reviewer thinks this is a good alternative to the listed services"
+					},
+					"createdAt": {
+						"type": "string",
+						"format": "datetime",
+						"description": "Timestamp when the review was created"
+					}
+				}
+			}
+		}
+	}
+}
