@@ -19,7 +19,7 @@ const __dirname = join(__filename, "..");
 
 // Target dimensions for normalized icons
 const ICON_SIZE = 128;
-const OUTPUT_DIR = join(__dirname, "..", "public", "icons");
+const OUTPUT_DIR = join(__dirname, "..", "static", "icons");
 
 async function downloadImage(url: string): Promise<Buffer> {
 	console.log(`Downloading: ${url}`);

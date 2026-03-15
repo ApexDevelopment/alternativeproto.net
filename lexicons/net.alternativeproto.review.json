@@ -34,7 +34,7 @@
 					},
 					"isGoodAlternative": {
 						"type": "boolean",
-						"description": "Hidden field: whether the reviewer thinks this is a good alternative to the listed services"
+						"description": "Whether the reviewer thinks this is a good alternative to the listed services"
 					},
 					"createdAt": {
 						"type": "string",

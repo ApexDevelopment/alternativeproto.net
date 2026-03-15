@@ -1,0 +1,382 @@
+<script lang="ts">
+	import { X } from "lucide-svelte";
+	import { submitProject } from "$lib/api";
+	import type { SubmissionData, AuthType } from "$lib/types";
+
+	let {
+		onClose,
+		existingTags = [],
+	}: {
+		onClose: () => void;
+		existingTags?: string[];
+	} = $props();
+
+	let name = $state("");
+	let description = $state("");
+	let icon = $state("");
+	let iconUrl = $state("");
+	let url = $state("");
+	let alternativeToStr = $state("");
+	let isOpenSource = $state(false);
+	let repositoryUrl = $state("");
+	let authType = $state<AuthType>("oauth");
+	let tagsStr = $state("");
+
+	let submitting = $state(false);
+	let formMessage = $state("");
+	let formMessageType = $state<"success" | "error">("success");
+	let closing = $state(false);
+
+	// Tag autocomplete
+	let tagSuggestionsVisible = $state(false);
+	let tagSuggestions = $state<string[]>([]);
+	let selectedSuggestionIndex = $state(-1);
+	let tagsInput: HTMLInputElement;
+
+	function closeModal() {
+		closing = true;
+		setTimeout(() => {
+			onClose();
+		}, 200);
+	}
+
+	function handleOverlayClick(e: MouseEvent) {
+		if (e.target === e.currentTarget) closeModal();
+	}
+
+	function getCurrentTagBeingTyped(): { tag: string; startIndex: number } {
+		const cursorPos = tagsInput?.selectionStart || 0;
+		const value = tagsStr;
+
+		let startIndex = 0;
+		for (let i = cursorPos - 1; i >= 0; i--) {
+			if (value[i] === ",") {
+				startIndex = i + 1;
+				break;
+			}
+		}
+
+		let endIndex = value.length;
+		for (let i = cursorPos; i < value.length; i++) {
+			if (value[i] === ",") {
+				endIndex = i;
+				break;
+			}
+		}
+
+		return {
+			tag: value.substring(startIndex, endIndex).trim().toLowerCase(),
+			startIndex,
+		};
+	}
+
+	function getAlreadyEnteredTags(): string[] {
+		return tagsStr
+			.split(",")
+			.map((t) => t.trim().toLowerCase())
+			.filter((t) => t.length > 0);
+	}
+
+	function showSuggestions() {
+		const { tag: currentTag } = getCurrentTagBeingTyped();
+		const enteredTags = getAlreadyEnteredTags();
+
+		if (currentTag.length === 0) {
+			tagSuggestionsVisible = false;
+			return;
+		}
+
+		const matches = existingTags
+			.filter(
+				(tag) =>
+					tag.toLowerCase().includes(currentTag) &&
+					!enteredTags.includes(tag.toLowerCase()),
+			)
+			.slice(0, 6);
+
+		if (matches.length === 0) {
+			tagSuggestionsVisible = false;
+			return;
+		}
+
+		selectedSuggestionIndex = -1;
+		tagSuggestions = matches;
+		tagSuggestionsVisible = true;
+	}
+
+	function selectSuggestion(tag: string) {
+		const value = tagsStr;
+		const cursorPos = tagsInput?.selectionStart || 0;
+
+		let startIndex = 0;
+		for (let i = cursorPos - 1; i >= 0; i--) {
+			if (value[i] === ",") {
+				startIndex = i + 1;
+				break;
+			}
+		}
+
+		let endIndex = value.length;
+		for (let i = cursorPos; i < value.length; i++) {
+			if (value[i] === ",") {
+				endIndex = i;
+				break;
+			}
+		}
+
+		const prefix = value.substring(0, startIndex);
+		const suffix = value.substring(endIndex);
+		const needsSpace = prefix.length > 0 && !prefix.endsWith(" ");
+
+		tagsStr = prefix + (needsSpace ? " " : "") + tag + suffix;
+		tagSuggestionsVisible = false;
+		tagsInput?.focus();
+	}
+
+	function handleTagKeydown(e: KeyboardEvent) {
+		if (!tagSuggestionsVisible || tagSuggestions.length === 0) return;
+
+		if (e.key === "ArrowDown") {
+			e.preventDefault();
+			selectedSuggestionIndex = Math.min(
+				selectedSuggestionIndex + 1,
+				tagSuggestions.length - 1,
+			);
+		} else if (e.key === "ArrowUp") {
+			e.preventDefault();
+			selectedSuggestionIndex = Math.max(selectedSuggestionIndex - 1, 0);
+		} else if (e.key === "Enter" && selectedSuggestionIndex >= 0) {
+			e.preventDefault();
+			selectSuggestion(tagSuggestions[selectedSuggestionIndex]);
+		} else if (e.key === "Escape") {
+			tagSuggestionsVisible = false;
+		}
+	}
+
+	async function handleSubmit(e: SubmitEvent) {
+		e.preventDefault();
+		submitting = true;
+
+		const iconUrlTrimmed = iconUrl.trim();
+
+		const data: SubmissionData = {
+			name,
+			description,
+			icon,
+			iconUrl: iconUrlTrimmed.length > 0 ? iconUrlTrimmed : undefined,
+			url,
+			alternativeTo: alternativeToStr
+				.split(",")
+				.map((a) => a.trim())
+				.filter((a) => a.length > 0),
+			isOpenSource,
+			authType,
+			repositoryUrl: isOpenSource ? repositoryUrl : undefined,
+			tags: tagsStr
+				.split(",")
+				.map((t) => t.trim().toLowerCase())
+				.filter((t) => t.length > 0),
+		};
+
+		try {
+			const result = await submitProject(data);
+			formMessage = result.message;
+			formMessageType = result.success ? "success" : "error";
+
+			if (result.success) {
+				setTimeout(closeModal, 2000);
+			} else {
+				submitting = false;
+			}
+		} catch {
+			formMessage = "An error occurred. Please try again.";
+			formMessageType = "error";
+			submitting = false;
+		}
+	}
+</script>
+
+<!-- svelte-ignore a11y_no_static_element_interactions a11y_interactive_supports_focus -->
+<div
+	class="modal-overlay"
+	class:closing
+	onclick={handleOverlayClick}
+	onkeydown={() => {}}
+	role="dialog"
+	aria-modal="true"
+>
+	<div class="modal">
+		<div class="modal-header">
+			<h2>Submit a Project</h2>
+			<button class="modal-close" aria-label="Close" onclick={closeModal}>
+				<X size={20} strokeWidth={2} />
+			</button>
+		</div>
+		<form class="submit-form" onsubmit={handleSubmit}>
+			<div class="form-group">
+				<label for="project-name">Project Name *</label>
+				<input
+					type="text"
+					id="project-name"
+					bind:value={name}
+					required
+					placeholder="e.g., MyApp"
+				/>
+			</div>
+
+			<div class="form-group">
+				<label for="project-description">Description *</label>
+				<textarea
+					id="project-description"
+					bind:value={description}
+					required
+					rows="3"
+					placeholder="Brief description of what the project does..."
+				></textarea>
+			</div>
+
+			<div class="form-group">
+				<label for="project-icon">Icon (emoji) *</label>
+				<input
+					type="text"
+					id="project-icon"
+					bind:value={icon}
+					required
+					placeholder="🚀"
+					maxlength="4"
+				/>
+				<small>Fallback emoji if no image icon is provided</small>
+			</div>
+
+			<div class="form-group">
+				<label for="project-icon-url">Icon Image URL</label>
+				<input
+					type="url"
+					id="project-icon-url"
+					bind:value={iconUrl}
+					placeholder="https://example.com/icon.png"
+				/>
+				<small
+					>Optional: URL to an image icon (recommended: square, at least
+					112x112px)</small
+				>
+			</div>
+
+			<div class="form-group">
+				<label for="project-url">Project URL *</label>
+				<input
+					type="url"
+					id="project-url"
+					bind:value={url}
+					required
+					placeholder="https://example.com"
+				/>
+			</div>
+
+			<div class="form-group">
+				<label for="project-alternative">Alternative To</label>
+				<input
+					type="text"
+					id="project-alternative"
+					bind:value={alternativeToStr}
+					placeholder="e.g., Twitter, Reddit, Medium (comma-separated)"
+				/>
+				<small
+					>What popular services is this an alternative to? Leave blank if
+					unique.</small
+				>
+			</div>
+
+			<div class="form-group toggle-group">
+				<span class="toggle-label-text">This project is open source</span>
+				<label class="toggle-switch" for="project-opensource">
+					<input
+						type="checkbox"
+						id="project-opensource"
+						bind:checked={isOpenSource}
+					/>
+					<span class="toggle-slider"></span>
+				</label>
+			</div>
+
+			{#if isOpenSource}
+				<div class="form-group">
+					<label for="project-repo">Repository URL</label>
+					<input
+						type="url"
+						id="project-repo"
+						bind:value={repositoryUrl}
+						placeholder="https://github.com/username/repo"
+					/>
+				</div>
+			{/if}
+
+			<div class="form-group">
+				<label for="project-auth">Authentication Type *</label>
+				<select
+					id="project-auth"
+					class="filter-select"
+					bind:value={authType}
+					required
+				>
+					<option value="oauth">OAuth (recommended)</option>
+					<option value="app-password">App Password</option>
+					<option value="none">No Login Required</option>
+				</select>
+				<small>How do users authenticate with this service?</small>
+			</div>
+
+			<div class="form-group">
+				<label for="project-tags">Tags *</label>
+				<div class="autocomplete-wrapper">
+					<input
+						type="text"
+						id="project-tags"
+						bind:this={tagsInput}
+						bind:value={tagsStr}
+						required
+						placeholder="social, mobile, federation (comma-separated)"
+						autocomplete="off"
+						oninput={showSuggestions}
+						onfocus={showSuggestions}
+						onkeydown={handleTagKeydown}
+					/>
+					{#if tagSuggestionsVisible}
+						<div class="autocomplete-dropdown" style="display: block;">
+							{#each tagSuggestions as tag, i}
+								<button
+									type="button"
+									class="autocomplete-item"
+									class:selected={i === selectedSuggestionIndex}
+									onclick={() => selectSuggestion(tag)}
+								>
+									{tag}
+								</button>
+							{/each}
+						</div>
+					{/if}
+				</div>
+				<small>Enter comma-separated tags for categorization</small>
+			</div>
+
+			<div class="form-actions">
+				<button
+					type="button"
+					class="btn btn-secondary"
+					onclick={closeModal}
+				>
+					Cancel
+				</button>
+				<button type="submit" class="btn btn-primary" disabled={submitting}>
+					{submitting ? "Submitting..." : "Submit for Review"}
+				</button>
+			</div>
+
+			{#if formMessage}
+				<div class="form-message {formMessageType}">
+					{formMessage}
+				</div>
+			{/if}
+		</form>
+	</div>
+</div>

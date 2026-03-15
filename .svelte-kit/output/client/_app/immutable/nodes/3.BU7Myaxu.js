@@ -1,0 +1,1 @@
+import{f as t,a as n}from"../chunks/C6qdvTq4.js";import"../chunks/CBxpQ1tQ.js";var i=t('<div class="not-found"><p>Processing authentication...</p></div>');function s(o){var a=i();n(o,a)}export{s as component};
