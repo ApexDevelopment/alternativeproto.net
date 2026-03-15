@@ -1,4 +1,4 @@
-import type { SubmissionData } from "./types";
+import type { SubmissionData, Submission, SubmissionRecord } from "./types";
 import {
 	getAuthenticatedClient,
 	getStoredSessionDid,
@@ -9,7 +9,90 @@ import type { Client } from "@atcute/client";
 export const SUBMISSION_COLLECTION = "net.alternativeproto.submission";
 export const VOTE_COLLECTION = "net.alternativeproto.vote";
 
+const PUBLIC_API = "https://public.api.bsky.app";
+
 export type VoteDirection = "up" | "down";
+
+function parseAtUri(uri: string): { did: string; collection: string; rkey: string } {
+	const match = uri.match(/^at:\/\/(did:[^/]+)\/([^/]+)\/([^/]+)$/);
+	if (!match) throw new Error(`Invalid AT URI: ${uri}`);
+	return { did: match[1], collection: match[2], rkey: match[3] };
+}
+
+function resolveIconUrl(did: string, record: SubmissionRecord): string | undefined {
+	if (!record.icon?.ref?.$link) return undefined;
+	return `${PUBLIC_API}/xrpc/com.atproto.sync.getBlob?did=${encodeURIComponent(did)}&cid=${encodeURIComponent(record.icon.ref.$link)}`;
+}
+
+function recordToSubmission(
+	uri: string,
+	cid: string,
+	value: SubmissionRecord,
+): Submission {
+	const { did, rkey } = parseAtUri(uri);
+	return {
+		uri,
+		cid,
+		did,
+		rkey,
+		record: value,
+		iconUrl: resolveIconUrl(did, value),
+	};
+}
+
+/** Fetch all submissions from a specific repo (by DID or handle) */
+export async function listSubmissions(repo: string): Promise<Submission[]> {
+	const submissions: Submission[] = [];
+	let cursor: string | undefined;
+
+	do {
+		const params = new URLSearchParams({
+			repo,
+			collection: SUBMISSION_COLLECTION,
+			limit: "100",
+		});
+		if (cursor) params.set("cursor", cursor);
+
+		const res = await fetch(
+			`${PUBLIC_API}/xrpc/com.atproto.repo.listRecords?${params}`,
+		);
+		if (!res.ok) {
+			console.error(`Failed to list submissions from ${repo}: ${res.status}`);
+			break;
+		}
+
+		const data = await res.json();
+		for (const item of data.records ?? []) {
+			const record = item.value as SubmissionRecord;
+			// Skip submissions without an icon — they won't be listed
+			if (!record.icon) continue;
+			submissions.push(recordToSubmission(item.uri, item.cid, record));
+		}
+		cursor = data.cursor;
+	} while (cursor);
+
+	return submissions;
+}
+
+/** Fetch a single submission by repo + rkey */
+export async function getSubmission(
+	repo: string,
+	rkey: string,
+): Promise<Submission | null> {
+	const params = new URLSearchParams({
+		repo,
+		collection: SUBMISSION_COLLECTION,
+		rkey,
+	});
+
+	const res = await fetch(
+		`${PUBLIC_API}/xrpc/com.atproto.repo.getRecord?${params}`,
+	);
+	if (!res.ok) return null;
+
+	const data = await res.json();
+	return recordToSubmission(data.uri, data.cid, data.value as SubmissionRecord);
+}
 
 export interface ReviewRecord {
 	projectId: string;

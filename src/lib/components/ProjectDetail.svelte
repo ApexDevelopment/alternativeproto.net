@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { Project } from "$lib/types";
+	import type { Submission } from "$lib/types";
 	import {
 		LockOpen,
 		Lock,
@@ -13,19 +13,27 @@
 	} from "lucide-svelte";
 	import ReviewForm from "./ReviewForm.svelte";
 
-	let { project, isSignedIn = false }: { project: Project; isSignedIn?: boolean } = $props();
+	let {
+		submission,
+		isSignedIn = false,
+	}: {
+		submission: Submission;
+		isSignedIn?: boolean;
+	} = $props();
 
 	let reviewSubmitted = $state(false);
 
+	const r = submission.record;
+	const alts = r.alternativeTo ?? [];
+	const tags = r.tags ?? [];
+
 	const alternativeText =
-		project.alternativeTo.length > 0
-			? project.alternativeTo.join(", ")
-			: "Unique ATProto app";
+		alts.length > 0 ? alts.join(", ") : "Unique ATProto app";
 
 	const authLabel =
-		project.authType === "oauth"
+		r.authType === "oauth"
 			? "OAuth"
-			: project.authType === "app-password"
+			: r.authType === "app-password"
 				? "App Password"
 				: "No Login Required";
 
@@ -37,40 +45,38 @@
 <div class="project-detail">
 	<div class="project-detail-hero">
 		<div class="project-detail-icon">
-			{#if project.iconUrl}
+			{#if submission.iconUrl}
 				<img
-					src={project.iconUrl}
-					alt="{project.name} icon"
+					src={submission.iconUrl}
+					alt="{r.name} icon"
 					class="project-detail-icon-img"
 				/>
-			{:else}
-				<span class="project-detail-icon-emoji">{project.icon}</span>
 			{/if}
 		</div>
 		<div class="project-detail-header">
-			<h1 class="project-detail-name">{project.name}</h1>
+			<h1 class="project-detail-name">{r.name}</h1>
 			<p class="project-detail-alternative">Alternative to {alternativeText}</p>
 		</div>
 	</div>
 
 	<div class="project-detail-badges">
-		<span class={project.isOpenSource ? "open-source-badge" : "closed-source-badge"}>
-			{#if project.isOpenSource}
+		<span class={r.isOpenSource ? "open-source-badge" : "closed-source-badge"}>
+			{#if r.isOpenSource}
 				<LockOpen size={16} strokeWidth={2.5} /> Open Source
 			{:else}
 				<Lock size={16} strokeWidth={2.5} /> Closed Source
 			{/if}
 		</span>
 		<span
-			class={project.authType === "oauth"
+			class={r.authType === "oauth"
 				? "oauth-badge"
-				: project.authType === "app-password"
+				: r.authType === "app-password"
 					? "app-password-badge"
 					: "no-login-badge"}
 		>
-			{#if project.authType === "oauth"}
+			{#if r.authType === "oauth"}
 				<KeyRound size={16} strokeWidth={2.5} />
-			{:else if project.authType === "app-password"}
+			{:else if r.authType === "app-password"}
 				<SquareAsterisk size={16} strokeWidth={2.5} />
 			{:else}
 				<UserRound size={16} strokeWidth={2.5} />
@@ -80,27 +86,27 @@
 	</div>
 
 	<div class="project-detail-description">
-		<p>{@html project.description}</p>
+		<p>{@html r.description}</p>
 	</div>
 
 	<div class="project-detail-tags">
-		{#each project.tags as tag}
+		{#each tags as tag}
 			<span class="tag">{tag}</span>
 		{/each}
 	</div>
 
 	<div class="project-detail-links">
 		<a
-			href={project.url}
+			href={r.url}
 			target="_blank"
 			rel="noopener noreferrer"
 			class="btn btn-primary"
 		>
-			<ExternalLink size={18} strokeWidth={2.5} /> Visit {project.name}
+			<ExternalLink size={18} strokeWidth={2.5} /> Visit {r.name}
 		</a>
-		{#if project.isOpenSource && project.repositoryUrl}
+		{#if r.isOpenSource && r.repositoryUrl}
 			<a
-				href={project.repositoryUrl}
+				href={r.repositoryUrl}
 				target="_blank"
 				rel="noopener noreferrer"
 				class="btn btn-secondary"
@@ -119,8 +125,8 @@
 			</div>
 		{:else if isSignedIn}
 			<ReviewForm
-				projectId={project.id}
-				projectName={project.name}
+				projectId={submission.uri}
+				projectName={r.name}
 				onSuccess={handleReviewSuccess}
 			/>
 		{:else}

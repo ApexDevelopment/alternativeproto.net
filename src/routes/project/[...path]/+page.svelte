@@ -1,27 +1,37 @@
 <script lang="ts">
-	import { getProjectBySlug } from "$lib/data";
+	import { getSubmission } from "$lib/api";
 	import { session } from "$lib/stores/session";
 	import { validateSession } from "$lib/auth/oauth";
 	import { onMount } from "svelte";
 	import ProjectDetail from "$lib/components/ProjectDetail.svelte";
-	import { FileQuestion, ArrowLeft } from "lucide-svelte";
+	import { FileQuestion, ArrowLeft, Loader2 } from "lucide-svelte";
+	import type { Submission } from "$lib/types";
 
 	let { data } = $props();
 
-	// slug comes from route param; doesn't change for this page instance
-	const project = getProjectBySlug(data.slug); // eslint-disable-line
+	let submission = $state<Submission | null>(null);
+	let loading = $state(true);
 
 	onMount(async () => {
-		// Validate session when viewing project detail (for review form)
 		if ($session) {
 			const validated = await validateSession();
 			session.set(validated);
 		}
+
+		if (data.did && data.rkey) {
+			submission = await getSubmission(data.did, data.rkey);
+		}
+		loading = false;
 	});
 </script>
 
-{#if project}
-	<ProjectDetail {project} isSignedIn={$session !== null} />
+{#if loading}
+	<div class="not-found">
+		<Loader2 size={48} strokeWidth={1.5} class="spinning" />
+		<p>Loading project...</p>
+	</div>
+{:else if submission}
+	<ProjectDetail {submission} isSignedIn={$session !== null} />
 {:else}
 	<div class="not-found">
 		<span class="not-found-icon"><FileQuestion size={64} strokeWidth={1.5} /></span>

@@ -1,10 +1,23 @@
 <script lang="ts">
-	import { projects, getAllTags, getAllAlternatives } from "$lib/data";
-	import type { Project } from "$lib/types";
+	import { listSubmissions } from "$lib/api";
+	import type { Submission } from "$lib/types";
 	import ProjectCard from "$lib/components/ProjectCard.svelte";
 	import SearchBar from "$lib/components/SearchBar.svelte";
 	import type { SearchFilters } from "$lib/components/SearchBar.svelte";
 	import { SearchX } from "lucide-svelte";
+	import { onMount } from "svelte";
+
+	const HUB_REPO = "alternativeproto.net";
+
+	let submissions = $state<Submission[]>([]);
+
+	onMount(async () => {
+		try {
+			submissions = await listSubmissions(HUB_REPO);
+		} catch (e) {
+			console.error("Failed to fetch submissions:", e);
+		}
+	});
 
 	let currentFilters = $state<SearchFilters>({
 		query: "",
@@ -13,56 +26,32 @@
 		openSourceOnly: false,
 	});
 
-	let filteredProjects = $derived.by(() => {
-		const hasActiveFilters =
-			currentFilters.query ||
-			currentFilters.tag ||
-			currentFilters.alternativeTo ||
-			currentFilters.openSourceOnly;
-
-		return projects.filter((project: Project) => {
-			if (!hasActiveFilters && project.tags.includes("alternative-client")) {
-				return false;
-			}
+	let filteredSubmissions = $derived.by(() => {
+		return submissions.filter((s) => {
+			const r = s.record;
+			const tags = r.tags ?? [];
+			const alts = r.alternativeTo ?? [];
 
 			if (currentFilters.query) {
-				const searchText = currentFilters.query;
-				const matchesName = project.name.toLowerCase().includes(searchText);
-				const matchesDescription = project.description
-					.toLowerCase()
-					.includes(searchText);
-				const matchesTags = project.tags.some((tag) =>
-					tag.toLowerCase().includes(searchText),
-				);
-				const matchesAlt = project.alternativeTo.some((alt) =>
-					alt.toLowerCase().includes(searchText),
-				);
-
-				if (
-					!matchesName &&
-					!matchesDescription &&
-					!matchesTags &&
-					!matchesAlt
-				) {
+				const q = currentFilters.query;
+				const matchesName = r.name.toLowerCase().includes(q);
+				const matchesDesc = r.description.toLowerCase().includes(q);
+				const matchesTags = tags.some((t) => t.toLowerCase().includes(q));
+				const matchesAlt = alts.some((a) => a.toLowerCase().includes(q));
+				if (!matchesName && !matchesDesc && !matchesTags && !matchesAlt) {
 					return false;
 				}
 			}
 
-			if (
-				currentFilters.tag &&
-				!project.tags.includes(currentFilters.tag)
-			) {
+			if (currentFilters.tag && !tags.includes(currentFilters.tag)) {
 				return false;
 			}
 
-			if (
-				currentFilters.alternativeTo &&
-				!project.alternativeTo.includes(currentFilters.alternativeTo)
-			) {
+			if (currentFilters.alternativeTo && !alts.includes(currentFilters.alternativeTo)) {
 				return false;
 			}
 
-			if (currentFilters.openSourceOnly && !project.isOpenSource) {
+			if (currentFilters.openSourceOnly && !r.isOpenSource) {
 				return false;
 			}
 
@@ -70,9 +59,16 @@
 		});
 	});
 
+	let allTags = $derived(
+		[...new Set(submissions.flatMap((s) => s.record.tags ?? []))].sort(),
+	);
+	let allAlternatives = $derived(
+		[...new Set(submissions.flatMap((s) => s.record.alternativeTo ?? []))].sort(),
+	);
+
 	let resultsText = $derived.by(() => {
-		const total = projects.length;
-		const filtered = filteredProjects.length;
+		const total = submissions.length;
+		const filtered = filteredSubmissions.length;
 		if (filtered === total) {
 			return `Showing all ${total} projects`;
 		}
@@ -85,23 +81,23 @@
 </script>
 
 <SearchBar
-	tags={getAllTags()}
-	alternatives={getAllAlternatives()}
+	tags={allTags}
+	alternatives={allAlternatives}
 	onFilterChange={handleFilterChange}
 />
 
 <div class="results-count">{resultsText}</div>
 
 <div class="projects-grid">
-	{#if filteredProjects.length === 0}
+	{#if filteredSubmissions.length === 0}
 		<div class="no-results">
 			<span class="no-results-icon"><SearchX size={48} strokeWidth={1.5} /></span>
 			<h3>No projects found</h3>
 			<p>Try adjusting your search or filters</p>
 		</div>
 	{:else}
-		{#each filteredProjects as project (project.id)}
-			<ProjectCard {project} />
+		{#each filteredSubmissions as submission (submission.uri)}
+			<ProjectCard {submission} />
 		{/each}
 	{/if}
 </div>

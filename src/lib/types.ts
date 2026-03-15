@@ -15,6 +15,34 @@ export interface Project {
 	tags: string[];
 }
 
+/** Shape of a submission record as stored in a user's PDS */
+export interface SubmissionRecord {
+	name: string;
+	description: string;
+	icon?: { ref: { $link: string }; mimeType: string; size: number };
+	url: string;
+	alternativeTo?: string[];
+	isOpenSource?: boolean;
+	authType: string;
+	repositoryUrl?: string;
+	tags?: string[];
+	createdAt: string;
+}
+
+/** A submission record enriched with AT Protocol metadata */
+export interface Submission {
+	/** AT URI (at://did/collection/rkey) */
+	uri: string;
+	cid: string;
+	/** DID of the submitter */
+	did: string;
+	/** rkey portion of the AT URI */
+	rkey: string;
+	record: SubmissionRecord;
+	/** Resolved icon URL (via PDS blob endpoint) */
+	iconUrl?: string;
+}
+
 export interface SubmissionData {
 	name: string;
 	description: string;
