@@ -27,7 +27,7 @@ type Did = `did:${string}:${string}`;
 type Handle = `${string}.${string}`;
 
 // PDS OAuth scope
-const OAUTH_SCOPE = "atproto repo:net.alternativeproto.review repo:net.alternativeproto.submission repo:net.alternativeproto.vote";
+const OAUTH_SCOPE = "atproto blob:*/* repo:net.alternativeproto.review repo:net.alternativeproto.submission repo:net.alternativeproto.vote";
 
 // Storage keys
 const SESSION_DID_KEY = "alternativeproto_session_did";
