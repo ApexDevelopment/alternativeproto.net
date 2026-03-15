@@ -33,9 +33,10 @@
 	onMount(async () => {
 		initializeOAuth();
 
+		let s = null;
 		if (isOAuthCallback()) {
 			try {
-				const s = await handleOAuthCallback();
+				s = await handleOAuthCallback();
 				session.set(s);
 				goto("/", { replaceState: true });
 			} catch (e) {
@@ -43,8 +44,17 @@
 				goto("/", { replaceState: true });
 			}
 		} else {
-			const s = await restoreSession();
+			s = await restoreSession();
 			session.set(s);
+		}
+
+		// Ask the server to backfill this user's submissions
+		if (s?.did) {
+			fetch("/api/backfill", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ did: s.did }),
+			}).catch(() => {});
 		}
 	});
 </script>
@@ -96,12 +106,6 @@
 			<a href="https://atproto.com" target="_blank" rel="noopener noreferrer"
 				>AT Protocol</a
 			>
-		</p>
-		<p class="footer-meta">
-			Have a suggestion?
-			<button class="link-button" onclick={() => (showSubmitForm = true)}>
-				Submit a project
-			</button>
 		</p>
 	</div>
 </footer>

@@ -28,88 +28,28 @@ async function getPdsUrl(actor: string): Promise<string> {
 
 export type VoteDirection = "up" | "down";
 
-function parseAtUri(uri: string): { did: string; collection: string; rkey: string } {
-	const match = uri.match(/^at:\/\/(did:[^/]+)\/([^/]+)\/([^/]+)$/);
-	if (!match) throw new Error(`Invalid AT URI: ${uri}`);
-	return { did: match[1], collection: match[2], rkey: match[3] };
+/** Fetch all submissions from the backend database */
+export async function listSubmissions(): Promise<Submission[]> {
+	const res = await fetch("/api/submissions");
+	if (!res.ok) {
+		throw new Error(`Failed to fetch submissions: ${res.status}`);
+	}
+	return res.json();
 }
 
-function resolveIconUrl(pdsUrl: string, did: string, record: SubmissionRecord): string | undefined {
-	if (!record.icon?.ref?.$link) return undefined;
-	return `${pdsUrl}/xrpc/com.atproto.sync.getBlob?did=${encodeURIComponent(did)}&cid=${encodeURIComponent(record.icon.ref.$link)}`;
-}
-
-function recordToSubmission(
-	pdsUrl: string,
-	uri: string,
-	cid: string,
-	value: SubmissionRecord,
-): Submission {
-	const { did, rkey } = parseAtUri(uri);
-	return {
-		uri,
-		cid,
-		did,
-		rkey,
-		record: value,
-		iconUrl: resolveIconUrl(pdsUrl, did, value),
-	};
-}
-
-/** Fetch all submissions from a specific repo (by DID or handle) */
-export async function listSubmissions(repo: string): Promise<Submission[]> {
-	const pdsUrl = await getPdsUrl(repo);
-	const submissions: Submission[] = [];
-	let cursor: string | undefined;
-
-	do {
-		const params = new URLSearchParams({
-			repo,
-			collection: SUBMISSION_COLLECTION,
-			limit: "100",
-		});
-		if (cursor) params.set("cursor", cursor);
-
-		const res = await fetch(
-			`${pdsUrl}/xrpc/com.atproto.repo.listRecords?${params}`,
-		);
-		if (!res.ok) {
-			console.error(`Failed to list submissions from ${repo}: ${res.status}`);
-			break;
-		}
-
-		const data = await res.json();
-		for (const item of data.records ?? []) {
-			const record = item.value as SubmissionRecord;
-			// Skip submissions without an icon — they won't be listed
-			if (!record.icon) continue;
-			submissions.push(recordToSubmission(pdsUrl, item.uri, item.cid, record));
-		}
-		cursor = data.cursor;
-	} while (cursor);
-
-	return submissions;
-}
-
-/** Fetch a single submission by repo + rkey */
+/** Fetch a single submission by DID + rkey from the backend database */
 export async function getSubmission(
-	repo: string,
+	did: string,
 	rkey: string,
 ): Promise<Submission | null> {
-	const pdsUrl = await getPdsUrl(repo);
-	const params = new URLSearchParams({
-		repo,
-		collection: SUBMISSION_COLLECTION,
-		rkey,
-	});
-
 	const res = await fetch(
-		`${pdsUrl}/xrpc/com.atproto.repo.getRecord?${params}`,
+		`/api/submissions/${encodeURIComponent(did)}/${encodeURIComponent(rkey)}`,
 	);
-	if (!res.ok) return null;
-
-	const data = await res.json();
-	return recordToSubmission(pdsUrl, data.uri, data.cid, data.value as SubmissionRecord);
+	if (res.status === 404) return null;
+	if (!res.ok) {
+		throw new Error(`Failed to fetch submission: ${res.status}`);
+	}
+	return res.json();
 }
 
 export interface ReviewRecord {
@@ -259,7 +199,7 @@ export async function submitProject(
 			return {
 				success: true,
 				message: iconBlobRef
-					? "Your submission has been received and is pending review. Thank you for contributing!"
+					? "Your submission has been received, thank you for contributing!"
 					: "Your submission has been received but no icon could be found. The project won't be listed until an icon is added.",
 			};
 		}
@@ -317,4 +257,113 @@ export async function deleteVote(rkey: string): Promise<void> {
 			rkey,
 		},
 	});
+}
+
+/** Check if a submission URL (sans scheme) matches a handle exactly */
+export function urlMatchesHandle(submissionUrl: string, handle: string): boolean {
+	try {
+		const hostname = new URL(submissionUrl).hostname;
+		return hostname.toLowerCase() === handle.toLowerCase();
+	} catch {
+		return false;
+	}
+}
+
+/** Check if the given repo already has a submission whose URL matches */
+export async function hasSubmissionWithUrl(
+	repo: string,
+	url: string,
+): Promise<boolean> {
+	const pdsUrl = await getPdsUrl(repo);
+	let cursor: string | undefined;
+
+	do {
+		const params = new URLSearchParams({
+			repo,
+			collection: SUBMISSION_COLLECTION,
+			limit: "100",
+		});
+		if (cursor) params.set("cursor", cursor);
+
+		const res = await fetch(
+			`${pdsUrl}/xrpc/com.atproto.repo.listRecords?${params}`,
+		);
+		if (!res.ok) break;
+
+		const data = await res.json();
+		for (const item of data.records ?? []) {
+			const record = item.value as SubmissionRecord;
+			if (record.url === url) return true;
+		}
+		cursor = data.cursor;
+	} while (cursor);
+
+	return false;
+}
+
+/** Copy a submission record to the logged-in user's PDS */
+export async function claimSubmission(
+	submission: Submission,
+): Promise<{ success: boolean; message: string }> {
+	const { client, did } = await getClientAndDid();
+	const srcRecord = submission.record;
+
+	// Re-upload the icon blob to the user's own PDS
+	let iconBlobRef: unknown = undefined;
+	if (submission.iconUrl) {
+		try {
+			const res = await fetch(submission.iconUrl);
+			if (res.ok) {
+				const blob = await res.blob();
+				iconBlobRef = await uploadBlob(client, blob);
+			}
+		} catch (e) {
+			console.warn("Failed to re-upload icon for claim:", e);
+		}
+	}
+
+	const record: Record<string, unknown> = {
+		$type: SUBMISSION_COLLECTION,
+		name: srcRecord.name,
+		description: srcRecord.description,
+		url: srcRecord.url,
+		alternativeTo: srcRecord.alternativeTo ?? [],
+		isOpenSource: srcRecord.isOpenSource ?? false,
+		authType: srcRecord.authType,
+		tags: srcRecord.tags ?? [],
+		createdAt: new Date().toISOString(),
+	};
+
+	if (iconBlobRef) {
+		record.icon = iconBlobRef;
+	}
+
+	if (srcRecord.repositoryUrl) {
+		record.repositoryUrl = srcRecord.repositoryUrl;
+	}
+
+	try {
+		const response = await client.post("com.atproto.repo.createRecord", {
+			input: {
+				repo: did,
+				collection: SUBMISSION_COLLECTION,
+				record,
+			},
+		});
+
+		if (response.ok) {
+			return {
+				success: true,
+				message: "Project claimed successfully! It is now attested under your account.",
+			};
+		}
+
+		return { success: false, message: "Failed to claim project. Please try again." };
+	} catch (e) {
+		console.error("Failed to claim submission:", e);
+		if (e instanceof Error && e.message.includes("auth")) {
+			throw new Error("Your session has expired. Please sign in again.");
+		}
+		throw new Error("Failed to claim project. Please try again.");
+	}
 }

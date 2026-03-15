@@ -4,7 +4,7 @@
 	import { validateSession } from "$lib/auth/oauth";
 	import { onMount } from "svelte";
 	import ProjectDetail from "$lib/components/ProjectDetail.svelte";
-	import { FileQuestion, ArrowLeft, Loader2 } from "lucide-svelte";
+	import { FileQuestion, ArrowLeft, LoaderCircle } from "lucide-svelte";
 	import type { Submission } from "$lib/types";
 
 	let { data } = $props();
@@ -27,11 +27,16 @@
 
 {#if loading}
 	<div class="not-found">
-		<Loader2 size={48} strokeWidth={1.5} class="spinning" />
+		<LoaderCircle size={48} strokeWidth={1.5} class="spinning" />
 		<p>Loading project...</p>
 	</div>
 {:else if submission}
-	<ProjectDetail {submission} isSignedIn={$session !== null} />
+	<ProjectDetail
+		{submission}
+		isSignedIn={$session !== null}
+		sessionHandle={$session?.handle ?? ""}
+		sessionDid={$session?.did ?? ""}
+	/>
 {:else}
 	<div class="not-found">
 		<span class="not-found-icon"><FileQuestion size={64} strokeWidth={1.5} /></span>

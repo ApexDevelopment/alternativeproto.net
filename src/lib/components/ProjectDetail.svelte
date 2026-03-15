@@ -1,6 +1,11 @@
 <script lang="ts">
 	import type { Submission } from "$lib/types";
 	import {
+		urlMatchesHandle,
+		hasSubmissionWithUrl,
+		claimSubmission,
+	} from "$lib/api";
+	import {
 		LockOpen,
 		Lock,
 		KeyRound,
@@ -10,15 +15,23 @@
 		Code,
 		MessageSquare,
 		LogIn,
+		ShieldCheck,
+		LoaderCircle,
+		Check,
 	} from "lucide-svelte";
 	import ReviewForm from "./ReviewForm.svelte";
+	import { onMount } from "svelte";
 
 	let {
 		submission,
 		isSignedIn = false,
+		sessionHandle = "",
+		sessionDid = "",
 	}: {
 		submission: Submission;
 		isSignedIn?: boolean;
+		sessionHandle?: string;
+		sessionDid?: string;
 	} = $props();
 
 	let reviewSubmitted = $state(false);
@@ -36,6 +49,35 @@
 			: r.authType === "app-password"
 				? "App Password"
 				: "No Login Required";
+
+	let canClaim = $state(false);
+	let claimState = $state<"idle" | "claiming" | "claimed" | "error">("idle");
+
+	onMount(async () => {
+		if (
+			!sessionHandle ||
+			!sessionDid ||
+			submission.did === sessionDid ||
+			!urlMatchesHandle(r.url, sessionHandle)
+		) {
+			return;
+		}
+
+		const alreadyHas = await hasSubmissionWithUrl(sessionDid, r.url);
+		if (!alreadyHas) {
+			canClaim = true;
+		}
+	});
+
+	async function handleClaim() {
+		claimState = "claiming";
+		try {
+			const result = await claimSubmission(submission);
+			claimState = result.success ? "claimed" : "error";
+		} catch {
+			claimState = "error";
+		}
+	}
 
 	function handleReviewSuccess() {
 		reviewSubmitted = true;
@@ -113,6 +155,25 @@
 			>
 				<Code size={18} strokeWidth={2.5} /> View Source
 			</a>
+		{/if}
+		{#if canClaim}
+			<button
+				class="btn btn-claim"
+				class:btn-claim-success={claimState === "claimed"}
+				class:btn-claim-error={claimState === "error"}
+				onclick={handleClaim}
+				disabled={claimState === "claiming" || claimState === "claimed"}
+			>
+				{#if claimState === "claiming"}
+					<LoaderCircle size={18} strokeWidth={2.5} class="spinning" />
+				{:else if claimState === "claimed"}
+					<Check size={18} strokeWidth={2.5} /> Claimed
+				{:else if claimState === "error"}
+					<ShieldCheck size={18} strokeWidth={2.5} /> Retry
+				{:else}
+					<ShieldCheck size={18} strokeWidth={2.5} /> Claim Project
+				{/if}
+			</button>
 		{/if}
 	</div>
 

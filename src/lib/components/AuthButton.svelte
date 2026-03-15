@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { LogIn, LogOut, X, Loader2 } from "lucide-svelte";
+	import { LogIn, LogOut, X, LoaderCircle } from "lucide-svelte";
 	import { login, logout } from "$lib/auth/oauth";
 	import type { SessionInfo } from "$lib/auth/oauth";
 	import { session } from "$lib/stores/session";
@@ -103,7 +103,7 @@
 				<div class="form-actions">
 					<button type="submit" class="btn btn-primary btn-block" disabled={loginLoading}>
 						{#if loginLoading}
-							<Loader2 size={18} strokeWidth={2} /> Redirecting...
+							<LoaderCircle size={18} strokeWidth={2} /> Redirecting...
 						{:else}
 							<LogIn size={18} strokeWidth={2} /> Continue
 						{/if}

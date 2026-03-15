@@ -2,6 +2,8 @@ import { createServer } from "node:http";
 import { readFile, stat } from "node:fs/promises";
 import { join, extname } from "node:path";
 import { startLabeler, DEFAULT_LABELER_PORT } from "./labeler-util";
+import { initDb, getAllSubmissions, getSubmissionByDidRkey, dbRowToSubmission, backfillDid } from "./db";
+import { startJetstream } from "./jetstream";
 
 const PORT = parseInt(process.env.PORT || "3000", 10);
 const LABELER_PORT = parseInt(
@@ -17,6 +19,10 @@ if (!labeler) {
 	);
 	process.exit(1);
 }
+
+// Initialize database and start Jetstream consumer
+await initDb();
+startJetstream();
 
 const MIME_TYPES: Record<string, string> = {
 	".html": "text/html; charset=utf-8",
@@ -58,6 +64,77 @@ async function serveStatic(
 const server = createServer(async (req, res) => {
 	const url = new URL(req.url || "/", `http://127.0.0.1:${PORT}`);
 	const pathname = decodeURIComponent(url.pathname);
+
+	// API: list all submissions
+	if (pathname === "/api/submissions" && req.method === "GET") {
+		try {
+			const rows = await getAllSubmissions();
+			const submissions = rows.map(dbRowToSubmission);
+			res.writeHead(200, {
+				"Content-Type": "application/json",
+				"Access-Control-Allow-Origin": "*",
+			});
+			res.end(JSON.stringify(submissions));
+		} catch (e) {
+			console.error("API error (list submissions):", e);
+			res.writeHead(500, { "Content-Type": "application/json" });
+			res.end(JSON.stringify({ error: "Internal server error" }));
+		}
+		return;
+	}
+
+	// API: get single submission by did/rkey
+	const submissionMatch = pathname.match(
+		/^\/api\/submissions\/([^/]+)\/([^/]+)$/,
+	);
+	if (submissionMatch && req.method === "GET") {
+		const [, did, rkey] = submissionMatch;
+		try {
+			const row = await getSubmissionByDidRkey(
+				decodeURIComponent(did),
+				decodeURIComponent(rkey),
+			);
+			if (!row) {
+				res.writeHead(404, { "Content-Type": "application/json" });
+				res.end(JSON.stringify({ error: "Not found" }));
+				return;
+			}
+			res.writeHead(200, {
+				"Content-Type": "application/json",
+				"Access-Control-Allow-Origin": "*",
+			});
+			res.end(JSON.stringify(dbRowToSubmission(row)));
+		} catch (e) {
+			console.error("API error (get submission):", e);
+			res.writeHead(500, { "Content-Type": "application/json" });
+			res.end(JSON.stringify({ error: "Internal server error" }));
+		}
+		return;
+	}
+
+	// API: backfill a user's submissions from their PDS
+	if (pathname === "/api/backfill" && req.method === "POST") {
+		let body = "";
+		req.on("data", (chunk) => (body += chunk));
+		req.on("end", async () => {
+			try {
+				const { did } = JSON.parse(body);
+				if (!did || typeof did !== "string") {
+					res.writeHead(400, { "Content-Type": "application/json" });
+					res.end(JSON.stringify({ error: "Missing did" }));
+					return;
+				}
+				const result = await backfillDid(did);
+				const status = result.status === "rate-limited" ? 429 : result.status === "ok" ? 200 : 500;
+				res.writeHead(status, { "Content-Type": "application/json" });
+				res.end(JSON.stringify(result));
+			} catch {
+				res.writeHead(400, { "Content-Type": "application/json" });
+				res.end(JSON.stringify({ error: "Invalid request body" }));
+			}
+		});
+		return;
+	}
 
 	// Proxy labeler XRPC endpoints
 	if (

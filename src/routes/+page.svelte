@@ -6,14 +6,13 @@
 	import type { SearchFilters } from "$lib/components/SearchBar.svelte";
 	import { SearchX } from "lucide-svelte";
 	import { onMount } from "svelte";
-
-	const HUB_REPO = "alternativeproto.net";
+	import { session } from "$lib/stores/session";
 
 	let submissions = $state<Submission[]>([]);
 
 	onMount(async () => {
 		try {
-			submissions = await listSubmissions(HUB_REPO);
+			submissions = await listSubmissions();
 		} catch (e) {
 			console.error("Failed to fetch submissions:", e);
 		}
@@ -97,7 +96,11 @@
 		</div>
 	{:else}
 		{#each filteredSubmissions as submission (submission.uri)}
-			<ProjectCard {submission} />
+			<ProjectCard
+				{submission}
+				sessionHandle={$session?.handle ?? ""}
+				sessionDid={$session?.did ?? ""}
+			/>
 		{/each}
 	{/if}
 </div>

@@ -296,7 +296,7 @@
 					type="text"
 					id="project-alternative"
 					bind:value={alternativeToStr}
-					placeholder="e.g., Twitter, Reddit, Medium (comma-separated)"
+					placeholder="e.g., Twitter/X, Reddit, Medium (comma-separated)"
 				/>
 				<small
 					>What popular services is this an alternative to? Leave blank if

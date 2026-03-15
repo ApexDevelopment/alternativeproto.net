@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Star, Send, Info, Loader2, CheckCircle } from "lucide-svelte";
+	import { Star, Send, Info, LoaderCircle, CheckCircle } from "lucide-svelte";
 	import { createReview } from "$lib/api";
 
 	let {
@@ -144,7 +144,7 @@
 			<div class="review-form-actions">
 				<button type="submit" class="btn btn-primary review-submit" disabled={!isValid || submitting}>
 					{#if submitting}
-						<Loader2 size={16} strokeWidth={2} /> Submitting...
+						<LoaderCircle size={16} strokeWidth={2} /> Submitting...
 					{:else}
 						<Send size={16} strokeWidth={2} /> Submit Review
 					{/if}
