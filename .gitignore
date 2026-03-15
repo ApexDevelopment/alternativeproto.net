@@ -26,6 +26,11 @@ dist-ssr
 # Env
 .env
 
+# Labeler SQLite
+labels.db
+labels.db-shm
+labels.db-wal
+
 # SvelteKit
 .svelte-kit
 build
