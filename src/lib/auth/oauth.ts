@@ -74,6 +74,19 @@ function getRedirectUri(): string {
 	return `${getBaseUrl()}/oauth/callback/`;
 }
 
+// Shared identity resolver — used by OAuth and api.ts for PDS resolution
+export const identityResolver = new LocalActorResolver({
+	handleResolver: new XrpcHandleResolver({
+		serviceUrl: "https://public.api.bsky.app",
+	}),
+	didDocumentResolver: new CompositeDidDocumentResolver({
+		methods: {
+			plc: new PlcDidDocumentResolver(),
+			web: new WebDidDocumentResolver(),
+		},
+	}),
+});
+
 // Initialize OAuth configuration - call once at app startup
 export function initializeOAuth(): void {
 	configureOAuth({
@@ -81,17 +94,7 @@ export function initializeOAuth(): void {
 			client_id: getClientId(),
 			redirect_uri: getRedirectUri(),
 		},
-		identityResolver: new LocalActorResolver({
-			handleResolver: new XrpcHandleResolver({
-				serviceUrl: "https://public.api.bsky.app",
-			}),
-			didDocumentResolver: new CompositeDidDocumentResolver({
-				methods: {
-					plc: new PlcDidDocumentResolver(),
-					web: new WebDidDocumentResolver(),
-				},
-			}),
-		}),
+		identityResolver: identityResolver,
 	});
 }
 

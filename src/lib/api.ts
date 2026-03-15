@@ -3,13 +3,28 @@ import {
 	getAuthenticatedClient,
 	getStoredSessionDid,
 	REVIEW_COLLECTION,
+	identityResolver,
 } from "./auth/oauth";
 import type { Client } from "@atcute/client";
 
 export const SUBMISSION_COLLECTION = "net.alternativeproto.submission";
 export const VOTE_COLLECTION = "net.alternativeproto.vote";
 
-const PUBLIC_API = "https://public.api.bsky.app";
+/** Resolve a DID or handle to its PDS service URL */
+async function resolvePds(actor: string): Promise<string> {
+	const resolved = await identityResolver.resolve(actor as any);
+	return resolved.pds.replace(/\/+$/, "");
+}
+
+// Cache PDS URLs to avoid repeated resolution
+const pdsCache = new Map<string, string>();
+async function getPdsUrl(actor: string): Promise<string> {
+	const cached = pdsCache.get(actor);
+	if (cached) return cached;
+	const pds = await resolvePds(actor);
+	pdsCache.set(actor, pds);
+	return pds;
+}
 
 export type VoteDirection = "up" | "down";
 
@@ -19,12 +34,13 @@ function parseAtUri(uri: string): { did: string; collection: string; rkey: strin
 	return { did: match[1], collection: match[2], rkey: match[3] };
 }
 
-function resolveIconUrl(did: string, record: SubmissionRecord): string | undefined {
+function resolveIconUrl(pdsUrl: string, did: string, record: SubmissionRecord): string | undefined {
 	if (!record.icon?.ref?.$link) return undefined;
-	return `${PUBLIC_API}/xrpc/com.atproto.sync.getBlob?did=${encodeURIComponent(did)}&cid=${encodeURIComponent(record.icon.ref.$link)}`;
+	return `${pdsUrl}/xrpc/com.atproto.sync.getBlob?did=${encodeURIComponent(did)}&cid=${encodeURIComponent(record.icon.ref.$link)}`;
 }
 
 function recordToSubmission(
+	pdsUrl: string,
 	uri: string,
 	cid: string,
 	value: SubmissionRecord,
@@ -36,12 +52,13 @@ function recordToSubmission(
 		did,
 		rkey,
 		record: value,
-		iconUrl: resolveIconUrl(did, value),
+		iconUrl: resolveIconUrl(pdsUrl, did, value),
 	};
 }
 
 /** Fetch all submissions from a specific repo (by DID or handle) */
 export async function listSubmissions(repo: string): Promise<Submission[]> {
+	const pdsUrl = await getPdsUrl(repo);
 	const submissions: Submission[] = [];
 	let cursor: string | undefined;
 
@@ -54,7 +71,7 @@ export async function listSubmissions(repo: string): Promise<Submission[]> {
 		if (cursor) params.set("cursor", cursor);
 
 		const res = await fetch(
-			`${PUBLIC_API}/xrpc/com.atproto.repo.listRecords?${params}`,
+			`${pdsUrl}/xrpc/com.atproto.repo.listRecords?${params}`,
 		);
 		if (!res.ok) {
 			console.error(`Failed to list submissions from ${repo}: ${res.status}`);
@@ -66,7 +83,7 @@ export async function listSubmissions(repo: string): Promise<Submission[]> {
 			const record = item.value as SubmissionRecord;
 			// Skip submissions without an icon — they won't be listed
 			if (!record.icon) continue;
-			submissions.push(recordToSubmission(item.uri, item.cid, record));
+			submissions.push(recordToSubmission(pdsUrl, item.uri, item.cid, record));
 		}
 		cursor = data.cursor;
 	} while (cursor);
@@ -79,6 +96,7 @@ export async function getSubmission(
 	repo: string,
 	rkey: string,
 ): Promise<Submission | null> {
+	const pdsUrl = await getPdsUrl(repo);
 	const params = new URLSearchParams({
 		repo,
 		collection: SUBMISSION_COLLECTION,
@@ -86,12 +104,12 @@ export async function getSubmission(
 	});
 
 	const res = await fetch(
-		`${PUBLIC_API}/xrpc/com.atproto.repo.getRecord?${params}`,
+		`${pdsUrl}/xrpc/com.atproto.repo.getRecord?${params}`,
 	);
 	if (!res.ok) return null;
 
 	const data = await res.json();
-	return recordToSubmission(data.uri, data.cid, data.value as SubmissionRecord);
+	return recordToSubmission(pdsUrl, data.uri, data.cid, data.value as SubmissionRecord);
 }
 
 export interface ReviewRecord {
@@ -118,13 +136,12 @@ async function uploadBlob(
 	client: Client,
 	blob: Blob,
 ): Promise<unknown> {
-	const arrayBuffer = await blob.arrayBuffer();
 	const response = await client.post("com.atproto.repo.uploadBlob", {
-		input: new Uint8Array(arrayBuffer),
-		encoding: blob.type || "application/octet-stream",
+		input: blob,
+		headers: { "content-type": blob.type || "application/octet-stream" },
 	});
 
-	if ("blob" in response.data) {
+	if (response.ok && "blob" in response.data) {
 		return response.data.blob;
 	}
 	throw new Error("Failed to upload blob");

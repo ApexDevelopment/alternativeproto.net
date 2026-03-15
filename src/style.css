@@ -75,17 +75,12 @@ a:not(.btn):not(.card-link):not(.link-button):not(.modal-close):not(
 
 /* Header */
 .site-header {
-	background: linear-gradient(
-		135deg,
-		var(--color-bg-secondary) 0%,
-		var(--color-bg) 100%
-	);
+	background: var(--color-bg-secondary);
 	border-bottom: 1px solid var(--color-border);
 	padding: 1.5rem 2rem;
 	position: sticky;
 	top: 0;
 	z-index: 100;
-	backdrop-filter: blur(10px);
 }
 
 .header-content {
@@ -654,10 +649,15 @@ a:not(.btn):not(.card-link):not(.link-button):not(.modal-close):not(
 }
 
 .autocomplete-item {
+	display: block;
+	width: 100%;
 	padding: 0.625rem 0.75rem;
 	cursor: pointer;
 	font-size: 0.9rem;
 	color: var(--color-text);
+	background: transparent;
+	border: none;
+	text-align: left;
 	transition: background var(--transition);
 }
 
