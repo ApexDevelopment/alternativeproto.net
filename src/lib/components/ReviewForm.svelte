@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { Star, Send, Info, Loader2, CheckCircle } from "lucide-svelte";
-	import { createReview } from "$lib/auth/oauth";
+	import { createReview } from "$lib/api";
 
 	let {
 		projectId,

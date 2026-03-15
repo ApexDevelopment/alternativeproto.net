@@ -18,8 +18,7 @@ export interface Project {
 export interface SubmissionData {
 	name: string;
 	description: string;
-	icon: string;
-	iconUrl?: string;
+	iconFile?: File;
 	url: string;
 	alternativeTo: string[];
 	isOpenSource: boolean;

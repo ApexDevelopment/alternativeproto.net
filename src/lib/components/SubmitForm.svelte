@@ -13,8 +13,9 @@
 
 	let name = $state("");
 	let description = $state("");
-	let icon = $state("");
-	let iconUrl = $state("");
+	let iconFile = $state<File | null>(null);
+	let iconPreviewUrl = $state("");
+	let iconWarningShown = $state(false);
 	let url = $state("");
 	let alternativeToStr = $state("");
 	let isOpenSource = $state(false);
@@ -42,6 +43,17 @@
 
 	function handleOverlayClick(e: MouseEvent) {
 		if (e.target === e.currentTarget) closeModal();
+	}
+
+	function handleIconChange(e: Event) {
+		const input = e.target as HTMLInputElement;
+		const file = input.files?.[0] ?? null;
+		iconFile = file;
+		iconWarningShown = false;
+		if (iconPreviewUrl) {
+			URL.revokeObjectURL(iconPreviewUrl);
+		}
+		iconPreviewUrl = file ? URL.createObjectURL(file) : "";
 	}
 
 	function getCurrentTagBeingTyped(): { tag: string; startIndex: number } {
@@ -155,15 +167,18 @@
 
 	async function handleSubmit(e: SubmitEvent) {
 		e.preventDefault();
-		submitting = true;
 
-		const iconUrlTrimmed = iconUrl.trim();
+		if (!iconFile && !iconWarningShown) {
+			iconWarningShown = true;
+			return;
+		}
+
+		submitting = true;
 
 		const data: SubmissionData = {
 			name,
 			description,
-			icon,
-			iconUrl: iconUrlTrimmed.length > 0 ? iconUrlTrimmed : undefined,
+			iconFile: iconFile ?? undefined,
 			url,
 			alternativeTo: alternativeToStr
 				.split(",")
@@ -188,8 +203,11 @@
 			} else {
 				submitting = false;
 			}
-		} catch {
-			formMessage = "An error occurred. Please try again.";
+		} catch (err) {
+			formMessage =
+				err instanceof Error
+					? err.message
+					: "An error occurred. Please try again.";
 			formMessageType = "error";
 			submitting = false;
 		}
@@ -236,31 +254,30 @@
 			</div>
 
 			<div class="form-group">
-				<label for="project-icon">Icon (emoji) *</label>
+				<label for="project-icon">Project Icon</label>
 				<input
-					type="text"
+					type="file"
 					id="project-icon"
-					bind:value={icon}
-					required
-					placeholder="🚀"
-					maxlength="4"
+					accept="image/png,image/jpeg,image/webp,image/svg+xml"
+					onchange={handleIconChange}
 				/>
-				<small>Fallback emoji if no image icon is provided</small>
+				<small>Recommended: square image, at least 128x128px</small>
+				{#if iconPreviewUrl}
+					<img
+						src={iconPreviewUrl}
+						alt="Icon preview"
+						style="width: 64px; height: 64px; margin-top: 0.5rem; border-radius: 8px; object-fit: cover;"
+					/>
+				{/if}
 			</div>
 
-			<div class="form-group">
-				<label for="project-icon-url">Icon Image URL</label>
-				<input
-					type="url"
-					id="project-icon-url"
-					bind:value={iconUrl}
-					placeholder="https://example.com/icon.png"
-				/>
-				<small
-					>Optional: URL to an image icon (recommended: square, at least
-					112x112px)</small
-				>
-			</div>
+			{#if iconWarningShown && !iconFile}
+				<div class="form-message error" style="margin-bottom: 1rem;">
+					<strong>No icon selected.</strong> We'll try to fetch the project's
+					favicon, but if none is found the project won't be listed until an
+					icon is added.
+				</div>
+			{/if}
 
 			<div class="form-group">
 				<label for="project-url">Project URL *</label>
@@ -368,7 +385,13 @@
 					Cancel
 				</button>
 				<button type="submit" class="btn btn-primary" disabled={submitting}>
-					{submitting ? "Submitting..." : "Submit for Review"}
+					{#if submitting}
+						Submitting...
+					{:else if iconWarningShown && !iconFile}
+						Submit Anyway
+					{:else}
+						Submit for Review
+					{/if}
 				</button>
 			</div>
 

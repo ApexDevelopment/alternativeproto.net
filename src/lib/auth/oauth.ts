@@ -27,7 +27,7 @@ type Did = `did:${string}:${string}`;
 type Handle = `${string}.${string}`;
 
 // PDS OAuth scope
-const OAUTH_SCOPE = "atproto repo:net.alternativeproto.review";
+const OAUTH_SCOPE = "atproto repo:net.alternativeproto.review repo:net.alternativeproto.submission repo:net.alternativeproto.vote";
 
 // Storage keys
 const SESSION_DID_KEY = "alternativeproto_session_did";
@@ -243,43 +243,4 @@ export async function getAuthenticatedClient(): Promise<Client | null> {
 	}
 }
 
-// Create a review record in the user's repository
-export interface ReviewRecord {
-	projectId: string;
-	rating: number; // 1-5
-	text: string;
-	isGoodAlternative: boolean;
-	createdAt: string;
-}
 
-export async function createReview(review: ReviewRecord): Promise<boolean> {
-	const client = await getAuthenticatedClient();
-	if (!client) {
-		throw new Error("Your session has expired. Please sign in again.");
-	}
-
-	const did = getStoredSessionDid();
-	if (!did) {
-		throw new Error("Your session has expired. Please sign in again.");
-	}
-
-	try {
-		const response = await client.post("com.atproto.repo.createRecord", {
-			input: {
-				repo: did,
-				collection: REVIEW_COLLECTION,
-				record: {
-					$type: REVIEW_COLLECTION,
-					...review,
-				},
-			},
-		});
-		return response.ok;
-	} catch (e) {
-		console.error("Failed to create review:", e);
-		if (e instanceof Error && e.message.includes("auth")) {
-			throw new Error("Your session has expired. Please sign in again.");
-		}
-		throw new Error("Failed to submit review. Please try again.");
-	}
-}

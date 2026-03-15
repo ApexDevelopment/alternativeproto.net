@@ -1,0 +1,90 @@
+{
+	"lexicon": 1,
+	"id": "net.alternativeproto.submission",
+	"defs": {
+		"main": {
+			"type": "record",
+			"description": "A user submission of a project to ATProto Alternatives",
+			"key": "tid",
+			"record": {
+				"type": "object",
+				"required": [
+					"name",
+					"description",
+					"url",
+					"authType",
+					"createdAt"
+				],
+				"properties": {
+					"name": {
+						"type": "string",
+						"maxLength": 200,
+						"description": "The project name"
+					},
+					"description": {
+						"type": "string",
+						"maxLength": 5000,
+						"description": "Description of the project"
+					},
+					"icon": {
+						"type": "blob",
+						"accept": [
+							"image/png",
+							"image/jpeg",
+							"image/webp",
+							"image/svg+xml",
+							"image/x-icon",
+							"image/vnd.microsoft.icon"
+						],
+						"maxSize": 1000000,
+						"description": "Project icon image blob"
+					},
+					"url": {
+						"type": "string",
+						"format": "uri",
+						"description": "The project URL"
+					},
+					"alternativeTo": {
+						"type": "array",
+						"items": {
+							"type": "string",
+							"maxLength": 100
+						},
+						"description": "Services this project is an alternative to"
+					},
+					"isOpenSource": {
+						"type": "boolean",
+						"description": "Whether the project is open source"
+					},
+					"authType": {
+						"type": "string",
+						"knownValues": [
+							"oauth",
+							"app-password",
+							"none"
+						],
+						"description": "Authentication method used by the project"
+					},
+					"repositoryUrl": {
+						"type": "string",
+						"format": "uri",
+						"description": "Source code repository URL"
+					},
+					"tags": {
+						"type": "array",
+						"items": {
+							"type": "string",
+							"maxLength": 50
+						},
+						"description": "Tags for categorization"
+					},
+					"createdAt": {
+						"type": "string",
+						"format": "datetime",
+						"description": "Timestamp when the submission was created"
+					}
+				}
+			}
+		}
+	}
+}
