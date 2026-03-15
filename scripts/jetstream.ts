@@ -4,7 +4,7 @@ import {
 	deleteSubmission,
 	getCursor,
 	setCursor,
-	resolvePds,
+	resolveIdentity,
 } from "./db";
 
 const COLLECTION = "net.alternativeproto.submission";
@@ -86,8 +86,8 @@ export function startJetstream() {
 				if (operation === "create" || operation === "update") {
 					if (!record || !cid) return;
 					try {
-						const pdsUrl = await resolvePds(did);
-						await upsertSubmission(uri, did, rkey, cid, pdsUrl, record);
+						const { pds, handle } = await resolveIdentity(did);
+						await upsertSubmission(uri, did, rkey, cid, pds, handle, record);
 						console.log(`[jetstream] Indexed ${operation}: ${uri}`);
 					} catch (e) {
 						console.error(`[jetstream] Failed to index ${uri}:`, e);

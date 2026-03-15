@@ -22,11 +22,19 @@ export async function initDb() {
 			rkey TEXT NOT NULL,
 			cid TEXT NOT NULL,
 			pds_url TEXT NOT NULL,
+			handle TEXT,
 			record JSONB NOT NULL,
 			indexed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 		)
 	`;
 	await sql`CREATE INDEX IF NOT EXISTS idx_submissions_did ON submissions(did)`;
+	// Migration: add handle column if missing (existing installs)
+	await sql`
+		DO $$ BEGIN
+			ALTER TABLE submissions ADD COLUMN handle TEXT;
+		EXCEPTION WHEN duplicate_column THEN NULL;
+		END $$
+	`;
 	await sql`
 		CREATE TABLE IF NOT EXISTS jetstream_cursor (
 			id INTEGER PRIMARY KEY DEFAULT 1,
@@ -41,6 +49,7 @@ export interface DbSubmission {
 	rkey: string;
 	cid: string;
 	pds_url: string;
+	handle: string | null;
 	record: Record<string, unknown>;
 	indexed_at: Date;
 }
@@ -51,15 +60,17 @@ export async function upsertSubmission(
 	rkey: string,
 	cid: string,
 	pdsUrl: string,
+	handle: string | null,
 	record: Record<string, unknown>,
 ) {
 	const sql = getSql();
 	await sql`
-		INSERT INTO submissions (uri, did, rkey, cid, pds_url, record)
-		VALUES (${uri}, ${did}, ${rkey}, ${cid}, ${pdsUrl}, ${sql.json(record)})
+		INSERT INTO submissions (uri, did, rkey, cid, pds_url, handle, record)
+		VALUES (${uri}, ${did}, ${rkey}, ${cid}, ${pdsUrl}, ${handle}, ${sql.json(record)})
 		ON CONFLICT (uri) DO UPDATE SET
 			cid = EXCLUDED.cid,
 			pds_url = EXCLUDED.pds_url,
+			handle = EXCLUDED.handle,
 			record = EXCLUDED.record,
 			indexed_at = NOW()
 	`;
@@ -70,9 +81,47 @@ export async function deleteSubmission(uri: string) {
 	await sql`DELETE FROM submissions WHERE uri = ${uri}`;
 }
 
+/**
+ * Return all submissions, deduplicating by URL.
+ * When multiple submissions share the same URL, prefer the one whose
+ * handle matches the URL hostname (i.e. the claimed/attested version).
+ */
 export async function getAllSubmissions(): Promise<DbSubmission[]> {
 	const sql = getSql();
-	return await sql<DbSubmission[]>`SELECT * FROM submissions ORDER BY indexed_at DESC`;
+	const rows = await sql<DbSubmission[]>`SELECT * FROM submissions ORDER BY indexed_at DESC`;
+
+	// Group by URL, pick attested version when available
+	const byUrl = new Map<string, DbSubmission>();
+	for (const row of rows) {
+		const url = (row.record as Record<string, unknown>).url as string | undefined;
+		if (!url) {
+			// No URL — keep as-is (shouldn't happen, but safe)
+			byUrl.set(row.uri, row);
+			continue;
+		}
+
+		const existing = byUrl.get(url);
+		if (!existing) {
+			byUrl.set(url, row);
+			continue;
+		}
+
+		// Prefer the submission whose handle matches the URL hostname
+		if (row.handle && handleMatchesUrl(row.handle, url)) {
+			byUrl.set(url, row);
+		}
+		// Otherwise keep the existing (first indexed / earlier)
+	}
+
+	return [...byUrl.values()];
+}
+
+function handleMatchesUrl(handle: string, url: string): boolean {
+	try {
+		return new URL(url).hostname.toLowerCase() === handle.toLowerCase();
+	} catch {
+		return false;
+	}
 }
 
 export async function getSubmissionByDidRkey(
@@ -105,13 +154,18 @@ export async function setCursor(cursorUs: bigint) {
 
 // ---------- PDS resolution (shared by jetstream + backfill) ----------
 
-const pdsCache = new Map<string, string>();
+const identityCache = new Map<string, { pds: string; handle: string | null }>();
 
-export async function resolvePds(did: string): Promise<string> {
-	const cached = pdsCache.get(did);
+export async function resolveIdentity(
+	did: string,
+): Promise<{ pds: string; handle: string | null }> {
+	const cached = identityCache.get(did);
 	if (cached) return cached;
 
-	let doc: { service?: Array<{ id: string; serviceEndpoint: string }> };
+	let doc: {
+		service?: Array<{ id: string; serviceEndpoint: string }>;
+		alsoKnownAs?: string[];
+	};
 
 	if (did.startsWith("did:plc:")) {
 		const res = await fetch(
@@ -133,9 +187,19 @@ export async function resolvePds(did: string): Promise<string> {
 	const svc = doc.service?.find((s) => s.id === "#atproto_pds");
 	if (!svc?.serviceEndpoint) throw new Error(`No PDS service for ${did}`);
 
-	const pdsUrl = svc.serviceEndpoint.replace(/\/+$/, "");
-	pdsCache.set(did, pdsUrl);
-	return pdsUrl;
+	const pds = svc.serviceEndpoint.replace(/\/+$/, "");
+	const handle =
+		doc.alsoKnownAs
+			?.find((a) => a.startsWith("at://"))
+			?.slice(5) ?? null;
+
+	const result = { pds, handle };
+	identityCache.set(did, result);
+	return result;
+}
+
+export async function resolvePds(did: string): Promise<string> {
+	return (await resolveIdentity(did)).pds;
 }
 
 // ---------- Backfill ----------
@@ -162,7 +226,7 @@ export async function backfillDid(
 	}
 
 	try {
-		const pdsUrl = await resolvePds(did);
+		const { pds: pdsUrl, handle } = await resolveIdentity(did);
 		let cursor: string | undefined;
 		let count = 0;
 
@@ -195,6 +259,7 @@ export async function backfillDid(
 					rkey,
 					item.cid,
 					pdsUrl,
+					handle,
 					item.value,
 				);
 				count++;
