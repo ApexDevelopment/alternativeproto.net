@@ -45,6 +45,14 @@ export async function initDb() {
 			PRIMARY KEY (did, rkey)
 		)
 	`;
+	await sql`
+		CREATE TABLE IF NOT EXISTS label_transfers (
+			from_uri TEXT NOT NULL,
+			to_uri TEXT NOT NULL,
+			label TEXT NOT NULL,
+			PRIMARY KEY (from_uri, to_uri, label)
+		)
+	`;
 }
 
 export interface DbSubmission {
@@ -190,6 +198,57 @@ export async function deleteAdminVote(did: string, rkey: string) {
 	await sql`DELETE FROM admin_votes WHERE did = ${did} AND rkey = ${rkey}`;
 }
 
+/** Find all admin upvotes targeting a given submission URI */
+export async function getAdminUpvotesForSubject(
+	subjectUri: string,
+): Promise<{ did: string; rkey: string; subject_uri: string; direction: string }[]> {
+	const sql = getSql();
+	return sql<{ did: string; rkey: string; subject_uri: string; direction: string }[]>`
+		SELECT did, rkey, subject_uri, direction FROM admin_votes
+		WHERE subject_uri = ${subjectUri} AND direction = 'up'
+	`;
+}
+
+/** Find all submissions sharing a URL (excluding a specific URI) */
+export async function findOtherSubmissionsByUrl(
+	url: string,
+	excludeUri: string,
+): Promise<DbSubmission[]> {
+	const sql = getSql();
+	return sql<DbSubmission[]>`
+		SELECT * FROM submissions
+		WHERE record->>'url' = ${url} AND uri != ${excludeUri}
+	`;
+}
+
+/** Check if a label transfer has already been recorded */
+export async function hasLabelTransfer(
+	fromUri: string,
+	toUri: string,
+	label: string,
+): Promise<boolean> {
+	const sql = getSql();
+	const rows = await sql`
+		SELECT 1 FROM label_transfers
+		WHERE from_uri = ${fromUri} AND to_uri = ${toUri} AND label = ${label}
+	`;
+	return rows.length > 0;
+}
+
+/** Record a completed label transfer */
+export async function recordLabelTransfer(
+	fromUri: string,
+	toUri: string,
+	label: string,
+) {
+	const sql = getSql();
+	await sql`
+		INSERT INTO label_transfers (from_uri, to_uri, label)
+		VALUES (${fromUri}, ${toUri}, ${label})
+		ON CONFLICT DO NOTHING
+	`;
+}
+
 // ---------- PDS resolution (shared by jetstream + backfill) ----------
 
 const identityCache = new Map<string, { pds: string; handle: string | null }>();
@@ -247,6 +306,7 @@ const BACKFILL_COOLDOWN_MS = 60 * 60 * 1000; // 1 hour
 
 export async function backfillDid(
 	did: string,
+	onIndex?: (uri: string, handle: string | null, record: Record<string, unknown>) => Promise<void>,
 ): Promise<{ status: "ok" | "rate-limited" | "error"; message: string }> {
 	// Validate DID format
 	if (!did.startsWith("did:")) {
@@ -300,6 +360,13 @@ export async function backfillDid(
 					handle,
 					item.value,
 				);
+				if (onIndex) {
+					try {
+						await onIndex(uri, handle, item.value);
+					} catch (e) {
+						console.error(`[backfill] onIndex callback error for ${uri}:`, e);
+					}
+				}
 				count++;
 			}
 			cursor = data.cursor;

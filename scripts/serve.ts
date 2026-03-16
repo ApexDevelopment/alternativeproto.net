@@ -3,6 +3,7 @@ import { readFile, stat } from "node:fs/promises";
 import { join, extname } from "node:path";
 import { startLabeler, DEFAULT_LABELER_PORT } from "./labeler-util";
 import { initDb, getAllSubmissions, getSubmissionByDidRkey, dbRowToSubmission, backfillDid } from "./db";
+import { transferLabelsForClaim } from "./jetstream";
 import { startJetstream } from "./jetstream";
 
 const PORT = parseInt(process.env.PORT || "3000", 10);
@@ -124,7 +125,7 @@ const server = createServer(async (req, res) => {
 					res.end(JSON.stringify({ error: "Missing did" }));
 					return;
 				}
-				const result = await backfillDid(did);
+				const result = await backfillDid(did, transferLabelsForClaim);
 				const status = result.status === "rate-limited" ? 429 : result.status === "ok" ? 200 : 500;
 				res.writeHead(status, { "Content-Type": "application/json" });
 				res.end(JSON.stringify(result));

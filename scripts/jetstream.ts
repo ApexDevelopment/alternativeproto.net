@@ -8,6 +8,10 @@ import {
 	saveAdminVote,
 	getAdminVote,
 	deleteAdminVote,
+	findOtherSubmissionsByUrl,
+	getAdminUpvotesForSubject,
+	hasLabelTransfer,
+	recordLabelTransfer,
 } from "./db";
 import { getLabelerInstance } from "./labeler-util";
 
@@ -65,6 +69,56 @@ async function handleVote(
 		if (vote.direction === "up") {
 			await labeler.createLabel({ val: VERIFIED_LABEL, uri: vote.subject_uri, neg: true });
 			console.log(`[jetstream] Negated ${VERIFIED_LABEL} on ${vote.subject_uri}`);
+		}
+	}
+}
+
+/**
+ * When an attested submission is indexed (handle matches URL), transfer any
+ * existing labels from older submissions with the same URL.
+ * Idempotent: skips transfers already recorded in label_transfers.
+ */
+export async function transferLabelsForClaim(
+	newUri: string,
+	handle: string | null,
+	record: Record<string, unknown>,
+) {
+	if (!handle) return;
+
+	const url = record.url as string | undefined;
+	if (!url) return;
+
+	// Only proceed if this submission is attested (handle matches URL)
+	try {
+		if (new URL(url).hostname.toLowerCase() !== handle.toLowerCase()) return;
+	} catch {
+		return;
+	}
+
+	const labeler = getLabelerInstance();
+	if (!labeler) return;
+
+	// Find other submissions with the same URL
+	const others = await findOtherSubmissionsByUrl(url, newUri);
+
+	for (const other of others) {
+		// Check if the old submission has admin upvotes
+		const upvotes = await getAdminUpvotesForSubject(other.uri);
+		if (upvotes.length === 0) continue;
+
+		// Transfer the label
+		if (await hasLabelTransfer(other.uri, newUri, VERIFIED_LABEL)) continue;
+
+		try {
+			// Apply label to new URI
+			await labeler.createLabel({ val: VERIFIED_LABEL, uri: newUri });
+			// Negate label on old URI
+			await labeler.createLabel({ val: VERIFIED_LABEL, uri: other.uri, neg: true });
+			// Record transfer so we don't repeat it
+			await recordLabelTransfer(other.uri, newUri, VERIFIED_LABEL);
+			console.log(`[label-transfer] Transferred ${VERIFIED_LABEL} from ${other.uri} to ${newUri}`);
+		} catch (e) {
+			console.error(`[label-transfer] Failed to transfer label from ${other.uri} to ${newUri}:`, e);
 		}
 	}
 }
@@ -137,6 +191,7 @@ export function startJetstream() {
 							const { pds, handle } = await resolveIdentity(did);
 							await upsertSubmission(uri, did, rkey, cid, pds, handle, record);
 							console.log(`[jetstream] Indexed ${operation}: ${uri}`);
+							await transferLabelsForClaim(uri, handle, record);
 						} catch (e) {
 							console.error(`[jetstream] Failed to index ${uri}:`, e);
 						}

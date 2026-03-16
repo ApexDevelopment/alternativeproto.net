@@ -37,7 +37,7 @@ function backendPlugin(): Plugin {
 		async configureServer(server) {
 			// Dynamic imports so these modules are only loaded during dev server
 			const db = await import("./scripts/db");
-			const { startJetstream } = await import("./scripts/jetstream");
+			const { startJetstream, transferLabelsForClaim } = await import("./scripts/jetstream");
 
 			await db.initDb();
 			startJetstream();
@@ -98,7 +98,7 @@ function backendPlugin(): Plugin {
 								res.end(JSON.stringify({ error: "Missing did" }));
 								return;
 							}
-							const result = await db.backfillDid(did);
+							const result = await db.backfillDid(did, transferLabelsForClaim);
 							res.statusCode = result.status === "rate-limited" ? 429 : result.status === "ok" ? 200 : 500;
 							res.setHeader("Content-Type", "application/json");
 							res.end(JSON.stringify(result));

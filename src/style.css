@@ -418,6 +418,12 @@ a:not(.btn):not(.card-link):not(.link-button):not(.modal-close):not(
 
 .name-badges {
 	white-space: nowrap;
+	display: inline-flex;
+	align-items: center;
+	vertical-align: middle;
+	/* Correct from x-height center to cap-height center.
+	   Inter metrics: cap=1490, x-height=1060, UPM=2048 */
+	transform: translateY(calc((0.5176em - 0.7275em) / 2));
 }
 
 .verified-badge {
