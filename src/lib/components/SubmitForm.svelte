@@ -336,7 +336,7 @@
 					bind:value={authType}
 					required
 				>
-					<option value="oauth">OAuth (recommended)</option>
+					<option value="oauth">OAuth</option>
 					<option value="app-password">App Password</option>
 					<option value="none">No Login Required</option>
 				</select>
