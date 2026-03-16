@@ -12,7 +12,6 @@
 	import { getAllTags } from "$lib/data";
 	import {
 		ArrowLeft,
-		Hexagon,
 		Plus,
 	} from "lucide-svelte";
 	import AuthButton from "$lib/components/AuthButton.svelte";
@@ -67,7 +66,7 @@
 					<ArrowLeft size={24} strokeWidth={2} />
 				</a>
 			{:else}
-				<span class="logo-icon"><Hexagon size={40} strokeWidth={1.5} /></span>
+				<span class="logo-icon"><img src="/logo.svg" alt="ATProto Alternatives" width={64} height={64} /></span>
 			{/if}
 			<div class="logo-text">
 				<h1>

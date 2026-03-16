@@ -16,6 +16,7 @@
 		ShieldCheck,
 		LoaderCircle,
 		Check,
+		BadgeCheck,
 	} from "lucide-svelte";
 	import { onMount } from "svelte";
 
@@ -91,7 +92,14 @@
 				{/if}
 			</div>
 			<div class="project-title-group">
-				<h3 class="project-name">{r.name}</h3>
+				<h3 class="project-name">
+					{r.name}
+					{#if submission.attestedBy}
+						<span class="verified-badge" title="Verified by @{submission.attestedBy}">
+							<BadgeCheck size={16} strokeWidth={2.5} />
+						</span>
+					{/if}
+				</h3>
 				<span class="alternative-badge">{alternativeText}</span>
 			</div>
 			<div class="badge-group">

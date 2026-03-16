@@ -41,6 +41,8 @@ export interface Submission {
 	record: SubmissionRecord;
 	/** Resolved icon URL (via PDS blob endpoint) */
 	iconUrl?: string;
+	/** Handle that attested this submission (handle matches URL hostname) */
+	attestedBy?: string;
 }
 
 export interface SubmissionData {

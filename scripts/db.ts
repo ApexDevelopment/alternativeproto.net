@@ -286,6 +286,13 @@ export function dbRowToSubmission(row: DbSubmission) {
 	if (icon?.ref?.$link) {
 		iconUrl = `${row.pds_url}/xrpc/com.atproto.sync.getBlob?did=${encodeURIComponent(row.did)}&cid=${encodeURIComponent(icon.ref.$link)}`;
 	}
+
+	const url = record.url as string | undefined;
+	const attested =
+		row.handle && url && handleMatchesUrl(row.handle, url)
+			? row.handle
+			: undefined;
+
 	return {
 		uri: row.uri,
 		cid: row.cid,
@@ -293,5 +300,6 @@ export function dbRowToSubmission(row: DbSubmission) {
 		rkey: row.rkey,
 		record,
 		iconUrl,
+		...(attested ? { attestedBy: attested } : {}),
 	};
 }

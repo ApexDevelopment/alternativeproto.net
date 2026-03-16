@@ -18,6 +18,7 @@
 		ShieldCheck,
 		LoaderCircle,
 		Check,
+		BadgeCheck,
 	} from "lucide-svelte";
 	import ReviewForm from "./ReviewForm.svelte";
 	import { onMount } from "svelte";
@@ -96,7 +97,14 @@
 			{/if}
 		</div>
 		<div class="project-detail-header">
-			<h1 class="project-detail-name">{r.name}</h1>
+			<h1 class="project-detail-name">
+				{r.name}
+				{#if submission.attestedBy}
+					<span class="verified-badge" title="Verified by @{submission.attestedBy}">
+						<BadgeCheck size={20} strokeWidth={2.5} />
+					</span>
+				{/if}
+			</h1>
 			<p class="project-detail-alternative">Alternative to {alternativeText}</p>
 		</div>
 	</div>
