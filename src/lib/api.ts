@@ -28,13 +28,63 @@ async function getPdsUrl(actor: string): Promise<string> {
 
 export type VoteDirection = "up" | "down";
 
+const VERIFIED_LABEL = "alternativeproto-verified";
+const COMMUNITY_VERIFIED_LABEL = "alternativeproto-community-verified";
+
+/** Fetch approval labels from the labeler for all submissions */
+async function fetchApprovals(): Promise<Map<string, "verified" | "community-verified">> {
+	const approvals = new Map<string, "verified" | "community-verified">();
+	try {
+		const params = new URLSearchParams();
+		params.append("uriPatterns", "at://*");
+		params.set("limit", "1000");
+		const res = await fetch(`/xrpc/com.atproto.label.queryLabels?${params}`);
+		if (!res.ok) return approvals;
+		const data = await res.json();
+
+		const verifiedUris = new Set<string>();
+		const communityUris = new Set<string>();
+		const negVerifiedUris = new Set<string>();
+		const negCommunityUris = new Set<string>();
+
+		for (const label of data.labels ?? []) {
+			if (label.val === VERIFIED_LABEL) {
+				if (label.neg) negVerifiedUris.add(label.uri);
+				else verifiedUris.add(label.uri);
+			} else if (label.val === COMMUNITY_VERIFIED_LABEL) {
+				if (label.neg) negCommunityUris.add(label.uri);
+				else communityUris.add(label.uri);
+			}
+		}
+		for (const uri of verifiedUris) {
+			if (!negVerifiedUris.has(uri)) approvals.set(uri, "verified");
+		}
+		for (const uri of communityUris) {
+			if (!negCommunityUris.has(uri) && !approvals.has(uri)) {
+				approvals.set(uri, "community-verified");
+			}
+		}
+	} catch {
+		// labeler unavailable — return empty map
+	}
+	return approvals;
+}
+
 /** Fetch all submissions from the backend database */
 export async function listSubmissions(): Promise<Submission[]> {
-	const res = await fetch("/api/submissions");
+	const [res, approvals] = await Promise.all([
+		fetch("/api/submissions"),
+		fetchApprovals(),
+	]);
 	if (!res.ok) {
 		throw new Error(`Failed to fetch submissions: ${res.status}`);
 	}
-	return res.json();
+	const submissions: Submission[] = await res.json();
+	for (const s of submissions) {
+		const a = approvals.get(s.uri);
+		if (a) s.approval = a;
+	}
+	return submissions;
 }
 
 /** Fetch a single submission by DID + rkey from the backend database */
@@ -42,21 +92,24 @@ export async function getSubmission(
 	did: string,
 	rkey: string,
 ): Promise<Submission | null> {
-	const res = await fetch(
-		`/api/submissions/${encodeURIComponent(did)}/${encodeURIComponent(rkey)}`,
-	);
+	const [res, approvals] = await Promise.all([
+		fetch(`/api/submissions/${encodeURIComponent(did)}/${encodeURIComponent(rkey)}`),
+		fetchApprovals(),
+	]);
 	if (res.status === 404) return null;
 	if (!res.ok) {
 		throw new Error(`Failed to fetch submission: ${res.status}`);
 	}
-	return res.json();
+	const submission: Submission = await res.json();
+	const a = approvals.get(submission.uri);
+	if (a) submission.approval = a;
+	return submission;
 }
 
 export interface ReviewRecord {
 	projectId: string;
 	rating: number; // 1-5
 	text: string;
-	isGoodAlternative: boolean;
 	createdAt: string;
 }
 
@@ -267,6 +320,42 @@ export function urlMatchesHandle(submissionUrl: string, handle: string): boolean
 	} catch {
 		return false;
 	}
+}
+
+/** Look up the current user's existing vote for a submission URI from their PDS */
+export async function getExistingVote(
+	submissionUri: string,
+): Promise<{ rkey: string; direction: VoteDirection } | null> {
+	const did = getStoredSessionDid();
+	if (!did) return null;
+
+	const pdsUrl = await getPdsUrl(did);
+	let cursor: string | undefined;
+
+	do {
+		const params = new URLSearchParams({
+			repo: did,
+			collection: VOTE_COLLECTION,
+			limit: "100",
+		});
+		if (cursor) params.set("cursor", cursor);
+
+		const res = await fetch(
+			`${pdsUrl}/xrpc/com.atproto.repo.listRecords?${params}`,
+		);
+		if (!res.ok) return null;
+
+		const data = await res.json();
+		for (const item of data.records ?? []) {
+			if (item.value?.subject?.uri === submissionUri) {
+				const rkey = (item.uri as string).split("/").pop()!;
+				return { rkey, direction: item.value.direction as VoteDirection };
+			}
+		}
+		cursor = data.cursor;
+	} while (cursor);
+
+	return null;
 }
 
 /** Check if the given repo already has a submission whose URL matches */

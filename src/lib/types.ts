@@ -43,6 +43,8 @@ export interface Submission {
 	iconUrl?: string;
 	/** Handle that attested this submission (handle matches URL hostname) */
 	attestedBy?: string;
+	/** Approval status based on labeler labels */
+	approval?: "verified" | "community-verified";
 }
 
 export interface SubmissionData {

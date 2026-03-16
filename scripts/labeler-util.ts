@@ -2,6 +2,13 @@ import { LabelerServer } from "@skyware/labeler";
 
 export const DEFAULT_LABELER_PORT = 14831;
 
+let _instance: LabelerServer | null = null;
+
+/** Returns the running labeler instance, or null if disabled. */
+export function getLabelerInstance(): LabelerServer | null {
+	return _instance;
+}
+
 export function startLabeler(
 	port = DEFAULT_LABELER_PORT,
 ): LabelerServer | null {
@@ -24,5 +31,6 @@ export function startLabeler(
 		}
 	});
 
+	_instance = labeler;
 	return labeler;
 }

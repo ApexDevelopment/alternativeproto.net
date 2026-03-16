@@ -17,6 +17,7 @@
 		LoaderCircle,
 		Check,
 		BadgeCheck,
+		Award,
 	} from "lucide-svelte";
 	import { onMount } from "svelte";
 
@@ -30,20 +31,22 @@
 		sessionDid?: string;
 	} = $props();
 
-	const r = submission.record;
-	const alts = r.alternativeTo ?? [];
-	const tags = r.tags ?? [];
-	const detailHref = `/project/${submission.did}/${submission.rkey}`;
+	let r = $derived(submission.record);
+	let alts = $derived(r.alternativeTo ?? []);
+	let tags = $derived(r.tags ?? []);
+	let detailHref = $derived(`/project/${submission.did}/${submission.rkey}`);
 
-	const alternativeText =
-		alts.length > 0 ? `Alternative to ${alts[0]}` : "Unique ATProto app";
+	let alternativeText = $derived(
+		alts.length > 0 ? `Alternative to ${alts[0]}` : "Unique ATProto app",
+	);
 
-	const authLabel =
+	let authLabel = $derived(
 		r.authType === "oauth"
 			? "OAuth"
 			: r.authType === "app-password"
 				? "App Password"
-				: "No Login";
+				: "No Login",
+	);
 
 	let canClaim = $state(false);
 	let claimState = $state<"idle" | "claiming" | "claimed" | "error">("idle");
@@ -97,6 +100,15 @@
 					{#if submission.attestedBy}
 						<span class="verified-badge" title="Verified by @{submission.attestedBy}">
 							<BadgeCheck size={16} strokeWidth={2.5} />
+						</span>
+					{/if}
+					{#if submission.approval === "verified"}
+						<span class="approval-badge approval-badge--official" title="Approved by AlternativeProto">
+							<Award size={16} strokeWidth={2.5} />
+						</span>
+					{:else if submission.approval === "community-verified"}
+						<span class="approval-badge approval-badge--community" title="Community-approved submission">
+							<Award size={16} strokeWidth={2.5} />
 						</span>
 					{/if}
 				</h3>

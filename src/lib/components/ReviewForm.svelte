@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Star, Send, Info, LoaderCircle, CheckCircle } from "lucide-svelte";
+	import { Star, Send, LoaderCircle, CheckCircle } from "lucide-svelte";
 	import { createReview } from "$lib/api";
 
 	let {
@@ -15,7 +15,6 @@
 	let selectedRating = $state(0);
 	let hoverRating = $state(0);
 	let reviewText = $state("");
-	let isGoodAlternative = $state(true);
 	let submitting = $state(false);
 	let submitted = $state(false);
 	let errorMessage = $state("");
@@ -52,7 +51,6 @@
 				projectId,
 				rating: selectedRating,
 				text: reviewText.trim(),
-				isGoodAlternative,
 				createdAt: new Date().toISOString(),
 			});
 
@@ -83,12 +81,12 @@
 			<div class="form-group">
 				<!-- svelte-ignore a11y_label_has_associated_control -->
 				<label>Rating</label>
-				<!-- svelte-ignore a11y_no_static_element_interactions a11y_interactive_supports_focus -->
 				<div
 					class="star-rating"
 					role="radiogroup"
 					aria-label="Rating"
 					onmouseleave={handleStarsLeave}
+					tabindex="-1"
 				>
 					{#each [1, 2, 3, 4, 5] as n}
 						<button
@@ -121,22 +119,6 @@
 				</small>
 			</div>
 
-			<div class="form-group toggle-group">
-				<span class="toggle-label-text"
-					>Is this a good alternative to the listed services?</span
-				>
-				<label class="toggle-switch" for="is-good-alt">
-					<input
-						type="checkbox"
-						id="is-good-alt"
-						bind:checked={isGoodAlternative}
-					/>
-					<span class="toggle-slider"></span>
-					<span class="toggle-text toggle-yes">Yes</span>
-					<span class="toggle-text toggle-no">No</span>
-				</label>
-			</div>
-
 			{#if errorMessage}
 				<p class="review-error">{errorMessage}</p>
 			{/if}
@@ -150,11 +132,6 @@
 					{/if}
 				</button>
 			</div>
-
-			<p class="review-form-info">
-				<Info size={14} strokeWidth={2} /> Your review will be stored in your ATProto
-				repository
-			</p>
 		</form>
 	</div>
 {/if}

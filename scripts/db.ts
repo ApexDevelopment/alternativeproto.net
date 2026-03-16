@@ -29,16 +29,20 @@ export async function initDb() {
 	`;
 	await sql`CREATE INDEX IF NOT EXISTS idx_submissions_did ON submissions(did)`;
 	// Migration: add handle column if missing (existing installs)
-	await sql`
-		DO $$ BEGIN
-			ALTER TABLE submissions ADD COLUMN handle TEXT;
-		EXCEPTION WHEN duplicate_column THEN NULL;
-		END $$
-	`;
+	await sql`ALTER TABLE submissions ADD COLUMN IF NOT EXISTS handle TEXT`;
 	await sql`
 		CREATE TABLE IF NOT EXISTS jetstream_cursor (
 			id INTEGER PRIMARY KEY DEFAULT 1,
 			cursor_us BIGINT NOT NULL
+		)
+	`;
+	await sql`
+		CREATE TABLE IF NOT EXISTS admin_votes (
+			did TEXT NOT NULL,
+			rkey TEXT NOT NULL,
+			subject_uri TEXT NOT NULL,
+			direction TEXT NOT NULL,
+			PRIMARY KEY (did, rkey)
 		)
 	`;
 }
@@ -150,6 +154,40 @@ export async function setCursor(cursorUs: bigint) {
 		VALUES (1, ${cursorUs.toString()})
 		ON CONFLICT (id) DO UPDATE SET cursor_us = EXCLUDED.cursor_us
 	`;
+}
+
+// ---------- Admin votes ----------
+
+export async function saveAdminVote(
+	did: string,
+	rkey: string,
+	subjectUri: string,
+	direction: string,
+) {
+	const sql = getSql();
+	await sql`
+		INSERT INTO admin_votes (did, rkey, subject_uri, direction)
+		VALUES (${did}, ${rkey}, ${subjectUri}, ${direction})
+		ON CONFLICT (did, rkey) DO UPDATE SET
+			subject_uri = EXCLUDED.subject_uri,
+			direction = EXCLUDED.direction
+	`;
+}
+
+export async function getAdminVote(
+	did: string,
+	rkey: string,
+): Promise<{ subject_uri: string; direction: string } | null> {
+	const sql = getSql();
+	const rows = await sql<{ subject_uri: string; direction: string }[]>`
+		SELECT subject_uri, direction FROM admin_votes WHERE did = ${did} AND rkey = ${rkey}
+	`;
+	return rows[0] ?? null;
+}
+
+export async function deleteAdminVote(did: string, rkey: string) {
+	const sql = getSql();
+	await sql`DELETE FROM admin_votes WHERE did = ${did} AND rkey = ${rkey}`;
 }
 
 // ---------- PDS resolution (shared by jetstream + backfill) ----------

@@ -12,7 +12,6 @@
 					"projectId",
 					"rating",
 					"text",
-					"isGoodAlternative",
 					"createdAt"
 				],
 				"properties": {
@@ -31,10 +30,6 @@
 						"maxLength": 3000,
 						"maxGraphemes": 1000,
 						"description": "The review text describing thoughts on the project"
-					},
-					"isGoodAlternative": {
-						"type": "boolean",
-						"description": "Whether the reviewer thinks this is a good alternative to the listed services"
 					},
 					"createdAt": {
 						"type": "string",

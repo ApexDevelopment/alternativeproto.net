@@ -4,6 +4,9 @@
 		urlMatchesHandle,
 		hasSubmissionWithUrl,
 		claimSubmission,
+		createVote,
+		deleteVote,
+		getExistingVote,
 	} from "$lib/api";
 	import {
 		LockOpen,
@@ -19,6 +22,9 @@
 		LoaderCircle,
 		Check,
 		BadgeCheck,
+		Award,
+		ThumbsUp,
+		ThumbsDown,
 	} from "lucide-svelte";
 	import ReviewForm from "./ReviewForm.svelte";
 	import { onMount } from "svelte";
@@ -37,24 +43,67 @@
 
 	let reviewSubmitted = $state(false);
 
-	const r = submission.record;
-	const alts = r.alternativeTo ?? [];
-	const tags = r.tags ?? [];
+	// Vote state
+	type VoteState = "none" | "up" | "down";
+	let voteState = $state<VoteState>("none");
+	let voteRkey = $state<string | null>(null);
+	let voteLoading = $state(false);
 
-	const alternativeText =
-		alts.length > 0 ? alts.join(", ") : "Unique ATProto app";
+	async function handleVote(direction: VoteState) {
+		if (!isSignedIn || voteLoading || direction === "none") return;
+		voteLoading = true;
+		try {
+			// Toggle off if already voted the same way
+			if (voteState === direction && voteRkey) {
+				await deleteVote(voteRkey);
+				voteState = "none";
+				voteRkey = null;
+			} else {
+				// Delete existing vote if switching direction
+				if (voteRkey) {
+					await deleteVote(voteRkey);
+				}
+				const result = await createVote(submission.uri, submission.cid, direction);
+				voteRkey = result.uri.split("/").pop() ?? null;
+				voteState = direction;
+			}
+		} catch (e) {
+			console.error("Vote error:", e);
+		} finally {
+			voteLoading = false;
+		}
+	}
 
-	const authLabel =
+	let r = $derived(submission.record);
+	let alts = $derived(r.alternativeTo ?? []);
+	let tags = $derived(r.tags ?? []);
+
+	let alternativeText = $derived(
+		alts.length > 0 ? alts.join(", ") : "Unique ATProto app",
+	);
+
+	let authLabel = $derived(
 		r.authType === "oauth"
 			? "OAuth"
 			: r.authType === "app-password"
 				? "App Password"
-				: "No Login Required";
+				: "No Login Required",
+	);
 
 	let canClaim = $state(false);
 	let claimState = $state<"idle" | "claiming" | "claimed" | "error">("idle");
 
 	onMount(async () => {
+		// Restore existing vote from PDS
+		if (isSignedIn) {
+			const existing = await getExistingVote(submission.uri);
+			if (existing) {
+				voteState = existing.direction;
+				voteRkey = existing.rkey;
+			}
+		}
+
+		// Check claim eligibility
 		if (
 			!sessionHandle ||
 			!sessionDid ||
@@ -102,6 +151,15 @@
 				{#if submission.attestedBy}
 					<span class="verified-badge" title="Verified by @{submission.attestedBy}">
 						<BadgeCheck size={20} strokeWidth={2.5} />
+					</span>
+				{/if}
+				{#if submission.approval === "verified"}
+					<span class="approval-badge approval-badge--official" title="Approved by AlternativeProto">
+						<Award size={20} strokeWidth={2.5} />
+					</span>
+				{:else if submission.approval === "community-verified"}
+					<span class="approval-badge approval-badge--community" title="Community-approved submission">
+						<Award size={20} strokeWidth={2.5} />
 					</span>
 				{/if}
 			</h1>
@@ -185,8 +243,42 @@
 		{/if}
 	</div>
 
+	{#if isSignedIn}
+		<div class="vote-box">
+			<p class="vote-box-question">Is this a good submission?</p>
+			<div class="vote-box-actions">
+				<button
+					class="btn vote-btn vote-btn-yes"
+					class:vote-btn-active={voteState === "up"}
+					onclick={() => handleVote("up")}
+					disabled={voteLoading}
+				>
+					{#if voteLoading && voteState !== "up"}
+						<LoaderCircle size={16} strokeWidth={2} class="spinning" />
+					{:else}
+						<ThumbsUp size={16} strokeWidth={2} />
+					{/if}
+					Yes
+				</button>
+				<button
+					class="btn vote-btn vote-btn-no"
+					class:vote-btn-active={voteState === "down"}
+					onclick={() => handleVote("down")}
+					disabled={voteLoading}
+				>
+					{#if voteLoading && voteState !== "down"}
+						<LoaderCircle size={16} strokeWidth={2} class="spinning" />
+					{:else}
+						<ThumbsDown size={16} strokeWidth={2} />
+					{/if}
+					No
+				</button>
+			</div>
+		</div>
+	{/if}
+
 	<div class="project-detail-review-section">
-		<h2><MessageSquare size={24} strokeWidth={2} /> Leave a Review</h2>
+		<h2><MessageSquare size={24} strokeWidth={2} /> Leave a review about {r.name}</h2>
 
 		{#if reviewSubmitted}
 			<div class="review-success">
