@@ -96,21 +96,8 @@
 			</div>
 			<div class="project-title-group">
 				<h3 class="project-name">
-					{r.name}
-					{#if submission.attestedBy}
-						<span class="verified-badge" title="Verified by @{submission.attestedBy}">
-							<BadgeCheck size={16} strokeWidth={2.5} />
-						</span>
-					{/if}
-					{#if submission.approval === "verified"}
-						<span class="approval-badge approval-badge--official" title="Approved by AlternativeProto">
-							<Award size={16} strokeWidth={2.5} />
-						</span>
-					{:else if submission.approval === "community-verified"}
-						<span class="approval-badge approval-badge--community" title="Community-approved submission">
-							<Award size={16} strokeWidth={2.5} />
-						</span>
-					{/if}
+					{r.name}<!--
+					-->{#if submission.attestedBy || submission.approval}<span class="name-badges">{#if submission.attestedBy}<span class="verified-badge" title="Verified by @{submission.attestedBy}"><BadgeCheck size={16} strokeWidth={2.5} /></span>{/if}{#if submission.approval === "verified"}<span class="approval-badge approval-badge--official" title="Approved by AlternativeProto"><Award size={16} strokeWidth={2.5} /></span>{:else if submission.approval === "community-verified"}<span class="approval-badge approval-badge--community" title="Community-approved submission"><Award size={16} strokeWidth={2.5} /></span>{/if}</span>{/if}
 				</h3>
 				<span class="alternative-badge">{alternativeText}</span>
 			</div>

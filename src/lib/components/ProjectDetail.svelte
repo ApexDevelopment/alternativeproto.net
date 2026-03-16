@@ -147,21 +147,8 @@
 		</div>
 		<div class="project-detail-header">
 			<h1 class="project-detail-name">
-				{r.name}
-				{#if submission.attestedBy}
-					<span class="verified-badge" title="Verified by @{submission.attestedBy}">
-						<BadgeCheck size={20} strokeWidth={2.5} />
-					</span>
-				{/if}
-				{#if submission.approval === "verified"}
-					<span class="approval-badge approval-badge--official" title="Approved by AlternativeProto">
-						<Award size={20} strokeWidth={2.5} />
-					</span>
-				{:else if submission.approval === "community-verified"}
-					<span class="approval-badge approval-badge--community" title="Community-approved submission">
-						<Award size={20} strokeWidth={2.5} />
-					</span>
-				{/if}
+				{r.name}<!--
+				-->{#if submission.attestedBy || submission.approval}<span class="name-badges">{#if submission.attestedBy}<span class="verified-badge" title="Verified by @{submission.attestedBy}"><BadgeCheck size={20} strokeWidth={2.5} /></span>{/if}{#if submission.approval === "verified"}<span class="approval-badge approval-badge--official" title="Approved by AlternativeProto"><Award size={20} strokeWidth={2.5} /></span>{:else if submission.approval === "community-verified"}<span class="approval-badge approval-badge--community" title="Community-approved submission"><Award size={20} strokeWidth={2.5} /></span>{/if}</span>{/if}
 			</h1>
 			<p class="project-detail-alternative">Alternative to {alternativeText}</p>
 		</div>
