@@ -4,7 +4,7 @@
 	import { validateSession } from "$lib/auth/oauth";
 	import { onMount } from "svelte";
 	import ProjectDetail from "$lib/components/ProjectDetail.svelte";
-	import { FileQuestion, ArrowLeft, LoaderCircle } from "lucide-svelte";
+	import { FileQuestionMark, ArrowLeft, LoaderCircle } from "lucide-svelte";
 	import type { Submission } from "$lib/types";
 
 	let { data } = $props();
@@ -39,7 +39,7 @@
 	/>
 {:else}
 	<div class="not-found">
-		<span class="not-found-icon"><FileQuestion size={64} strokeWidth={1.5} /></span>
+		<span class="not-found-icon"><FileQuestionMark size={64} strokeWidth={1.5} /></span>
 		<h2>Project not found</h2>
 		<p>The project you're looking for doesn't exist.</p>
 		<a href="/" class="btn btn-primary">

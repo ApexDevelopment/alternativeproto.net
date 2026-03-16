@@ -336,6 +336,7 @@ export function dbRowToSubmission(row: DbSubmission) {
 		cid: row.cid,
 		did: row.did,
 		rkey: row.rkey,
+		handle: row.handle ?? undefined,
 		record,
 		iconUrl,
 		...(attested ? { attestedBy: attested } : {}),

@@ -4,7 +4,7 @@
 	"defs": {
 		"main": {
 			"type": "record",
-			"description": "A user vote on a submission to ATProto Alternatives. Each user may cast one vote per submission.",
+			"description": "A user vote on a submission to AlternativeProto. Each user may cast one vote per submission.",
 			"key": "tid",
 			"record": {
 				"type": "object",

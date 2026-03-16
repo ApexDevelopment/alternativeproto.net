@@ -4,7 +4,7 @@
 	"defs": {
 		"main": {
 			"type": "record",
-			"description": "A user submission of a project to ATProto Alternatives",
+			"description": "A user submission of a project to AlternativeProto",
 			"key": "tid",
 			"record": {
 				"type": "object",

@@ -1,6 +1,6 @@
 {
 	"client_id": "http://localhost:5173/oauth-client-metadata.json",
-	"client_name": "ATProto Alternatives",
+	"client_name": "AlternativeProto",
 	"client_uri": "http://localhost:5173",
 	"logo_uri": "http://localhost:5173/icons/logo.png",
 	"redirect_uris": ["http://localhost:5173/oauth/callback/"],

@@ -66,18 +66,18 @@
 					<ArrowLeft size={24} strokeWidth={2} />
 				</a>
 			{:else}
-				<span class="logo-icon"><img src="/logo.svg" alt="ATProto Alternatives" width={64} height={64} /></span>
+				<span class="logo-icon"><img src="/logo.svg" alt="AlternativeProto" width={64} height={64} /></span>
 			{/if}
 			<div class="logo-text">
 				<h1>
 					{#if isDetailView}
-						<a href="/" class="logo-link">ATProto Alternatives</a>
+						<a href="/" class="logo-link">AlternativeProto</a>
 					{:else}
-						ATProto Alternatives
+						AlternativeProto
 					{/if}
 				</h1>
 				<p class="tagline">
-					Discover decentralized alternatives built on the AT Protocol
+					Decentralized alternatives to popular websites
 				</p>
 			</div>
 		</div>
@@ -100,7 +100,7 @@
 <footer class="site-footer">
 	<div class="footer-content">
 		<p>
-			<strong>ATProto Alternatives</strong> — A community-curated catalog of
+			<strong>AlternativeProto</strong> — A community-curated catalog of
 			applications built on the
 			<a href="https://atproto.com" target="_blank" rel="noopener noreferrer"
 				>AT Protocol</a

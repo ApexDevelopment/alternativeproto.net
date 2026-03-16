@@ -206,6 +206,7 @@
 		</div>
 	</div>
 
+	<div class="project-detail-body">
 	<div class="project-detail-info-box">
 		<p>{@html r.description}</p>
 		<hr class="project-detail-info-divider" />
@@ -244,8 +245,14 @@
 	</div>
 
 	{#if isSignedIn}
+		<hr class="project-detail-section-divider" />
 		<div class="vote-box">
-			<p class="vote-box-question">Is this a good submission?</p>
+			<div class="vote-box-info">
+				<p class="vote-box-question">Is this a good submission?</p>
+				{#if submission.handle}
+					<p class="vote-box-submitter">Submitted by @{submission.handle}</p>
+				{/if}
+			</div>
 			<div class="vote-box-actions">
 				<button
 					class="btn vote-btn vote-btn-yes"
@@ -277,6 +284,7 @@
 		</div>
 	{/if}
 
+	<hr class="project-detail-section-divider" />
 	<div class="project-detail-review-section">
 		<h2><MessageSquare size={24} strokeWidth={2} /> Leave a review about {r.name}</h2>
 
@@ -296,5 +304,6 @@
 				<p>Sign in with your ATProto account to leave a review</p>
 			</div>
 		{/if}
+	</div>
 	</div>
 </div>

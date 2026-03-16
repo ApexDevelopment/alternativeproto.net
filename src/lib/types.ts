@@ -36,6 +36,8 @@ export interface Submission {
 	cid: string;
 	/** DID of the submitter */
 	did: string;
+	/** Handle of the submitter */
+	handle?: string;
 	/** rkey portion of the AT URI */
 	rkey: string;
 	record: SubmissionRecord;
