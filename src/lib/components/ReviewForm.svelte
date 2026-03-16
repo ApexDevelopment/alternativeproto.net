@@ -126,7 +126,7 @@
 			<div class="review-form-actions">
 				<button type="submit" class="btn btn-primary review-submit" disabled={!isValid || submitting}>
 					{#if submitting}
-						<LoaderCircle size={16} strokeWidth={2} /> Submitting...
+						<LoaderCircle size={16} strokeWidth={2} class="spinning" /> Submitting...
 					{:else}
 						<Send size={16} strokeWidth={2} /> Submit Review
 					{/if}

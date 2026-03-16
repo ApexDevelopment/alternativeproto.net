@@ -165,81 +165,81 @@
 			</h1>
 			<p class="project-detail-alternative">Alternative to {alternativeText}</p>
 		</div>
-	</div>
-
-	<div class="project-detail-badges">
-		<span class={r.isOpenSource ? "open-source-badge" : "closed-source-badge"}>
-			{#if r.isOpenSource}
-				<LockOpen size={16} strokeWidth={2.5} /> Open Source
-			{:else}
-				<Lock size={16} strokeWidth={2.5} /> Closed Source
-			{/if}
-		</span>
-		<span
-			class={r.authType === "oauth"
-				? "oauth-badge"
-				: r.authType === "app-password"
-					? "app-password-badge"
-					: "no-login-badge"}
-		>
-			{#if r.authType === "oauth"}
-				<KeyRound size={16} strokeWidth={2.5} />
-			{:else if r.authType === "app-password"}
-				<SquareAsterisk size={16} strokeWidth={2.5} />
-			{:else}
-				<UserRound size={16} strokeWidth={2.5} />
-			{/if}
-			{authLabel}
-		</span>
-	</div>
-
-	<div class="project-detail-description">
-		<p>{@html r.description}</p>
-	</div>
-
-	<div class="project-detail-tags">
-		{#each tags as tag}
-			<span class="tag">{tag}</span>
-		{/each}
-	</div>
-
-	<div class="project-detail-links">
-		<a
-			href={r.url}
-			target="_blank"
-			rel="noopener noreferrer"
-			class="btn btn-primary"
-		>
-			<ExternalLink size={18} strokeWidth={2.5} /> Visit {r.name}
-		</a>
-		{#if r.isOpenSource && r.repositoryUrl}
+		<div class="project-detail-hero-actions">
 			<a
-				href={r.repositoryUrl}
+				href={r.url}
 				target="_blank"
 				rel="noopener noreferrer"
-				class="btn btn-secondary"
+				class="btn btn-primary"
 			>
-				<Code size={18} strokeWidth={2.5} /> View Source
+				<ExternalLink size={16} strokeWidth={2.5} /> Visit {r.name}
 			</a>
-		{/if}
-		{#if canClaim}
-			<button
-				class="btn btn-claim"
-				class:btn-claim-success={claimState === "claimed"}
-				class:btn-claim-error={claimState === "error"}
-				onclick={handleClaim}
-				disabled={claimState === "claiming" || claimState === "claimed"}
-			>
-				{#if claimState === "claiming"}
-					<LoaderCircle size={18} strokeWidth={2.5} class="spinning" />
-				{:else if claimState === "claimed"}
-					<Check size={18} strokeWidth={2.5} /> Claimed
-				{:else if claimState === "error"}
-					<ShieldCheck size={18} strokeWidth={2.5} /> Retry
+			{#if r.isOpenSource && r.repositoryUrl}
+				<a
+					href={r.repositoryUrl}
+					target="_blank"
+					rel="noopener noreferrer"
+					class="btn btn-secondary"
+				>
+					<Code size={16} strokeWidth={2.5} /> View Source
+				</a>
+			{/if}
+			{#if canClaim}
+				<button
+					class="btn btn-claim"
+					class:btn-claim-success={claimState === "claimed"}
+					class:btn-claim-error={claimState === "error"}
+					onclick={handleClaim}
+					disabled={claimState === "claiming" || claimState === "claimed"}
+				>
+					{#if claimState === "claiming"}
+						<LoaderCircle size={16} strokeWidth={2.5} class="spinning" />
+					{:else if claimState === "claimed"}
+						<Check size={16} strokeWidth={2.5} /> Claimed
+					{:else if claimState === "error"}
+						<ShieldCheck size={16} strokeWidth={2.5} /> Retry
+					{:else}
+						<ShieldCheck size={16} strokeWidth={2.5} /> Claim
+					{/if}
+				</button>
+			{/if}
+		</div>
+	</div>
+
+	<div class="project-detail-info-box">
+		<p>{@html r.description}</p>
+		<hr class="project-detail-info-divider" />
+		<div class="project-detail-info-badges">
+			<span class={r.isOpenSource ? "open-source-badge" : "closed-source-badge"}>
+				{#if r.isOpenSource}
+					<LockOpen size={16} strokeWidth={2.5} /> Open Source
 				{:else}
-					<ShieldCheck size={18} strokeWidth={2.5} /> Claim Project
+					<Lock size={16} strokeWidth={2.5} /> Closed Source
 				{/if}
-			</button>
+			</span>
+			<span
+				class={r.authType === "oauth"
+					? "oauth-badge"
+					: r.authType === "app-password"
+						? "app-password-badge"
+						: "no-login-badge"}
+			>
+				{#if r.authType === "oauth"}
+					<KeyRound size={16} strokeWidth={2.5} />
+				{:else if r.authType === "app-password"}
+					<SquareAsterisk size={16} strokeWidth={2.5} />
+				{:else}
+					<UserRound size={16} strokeWidth={2.5} />
+				{/if}
+				{authLabel}
+			</span>
+		</div>
+		{#if tags.length > 0}
+			<div class="project-detail-info-tags">
+				{#each tags as tag}
+					<span class="tag">{tag}</span>
+				{/each}
+			</div>
 		{/if}
 	</div>
 

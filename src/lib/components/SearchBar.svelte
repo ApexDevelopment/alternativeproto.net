@@ -39,7 +39,7 @@
 			<span class="search-icon"><Search size={20} strokeWidth={2} /></span>
 			<input
 				type="text"
-				placeholder="Search projects by name, description, or tags..."
+				placeholder="Search projects..."
 				class="search-input"
 				bind:value={query}
 				oninput={emitFilters}

@@ -87,7 +87,7 @@
 				class="btn btn-primary"
 				onclick={() => (showSubmitForm = true)}
 			>
-				<Plus size={18} strokeWidth={2.5} /> Submit Project
+				<Plus size={18} strokeWidth={2.5} /> <span class="btn-label">Submit Project</span>
 			</button>
 		</nav>
 	</div>

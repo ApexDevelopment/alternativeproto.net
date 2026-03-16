@@ -56,12 +56,12 @@
 		<div class="auth-user">
 			<span class="auth-handle">@{currentSession.handle}</span>
 			<button class="btn btn-secondary auth-btn auth-signout" onclick={handleLogout}>
-				<LogOut size={18} strokeWidth={2} /> Sign out
+				<LogOut size={18} strokeWidth={2} /> <span class="btn-label">Sign out</span>
 			</button>
 		</div>
 	{:else}
 		<button class="btn btn-secondary auth-btn auth-signin" onclick={openLoginModal}>
-			<LogIn size={18} strokeWidth={2} /> Sign in
+			<LogIn size={18} strokeWidth={2} /> <span class="btn-label">Sign in</span>
 		</button>
 	{/if}
 </div>
@@ -103,7 +103,7 @@
 				<div class="form-actions">
 					<button type="submit" class="btn btn-primary btn-block" disabled={loginLoading}>
 						{#if loginLoading}
-							<LoaderCircle size={18} strokeWidth={2} /> Redirecting...
+							<LoaderCircle size={18} strokeWidth={2} class="spinning" /> Redirecting...
 						{:else}
 							<LogIn size={18} strokeWidth={2} /> Continue
 						{/if}
