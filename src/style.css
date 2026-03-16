@@ -233,6 +233,7 @@ a:not(.btn):not(.card-link):not(.link-button):not(.modal-close):not(
 	border-radius: var(--radius-lg);
 	padding: 1rem 1.25rem;
 	margin-bottom: 1.25rem;
+	overflow: scroll;
 }
 
 .search-row {
@@ -352,7 +353,7 @@ a:not(.btn):not(.card-link):not(.link-button):not(.modal-close):not(
 	background: var(--color-border);
 	border: 1px solid var(--color-border);
 	border-radius: var(--radius-lg);
-	overflow: hidden;
+	overflow: scroll;
 }
 
 /* ── Project Card ───────────────────────────── */
@@ -1232,6 +1233,12 @@ a:not(.btn):not(.card-link):not(.link-button):not(.modal-close):not(
 
 	.project-detail-review-section {
 		padding: 1rem;
+	}
+}
+
+@media (max-width: 322px) {
+	.auth-handle {
+		display: none;
 	}
 }
 
