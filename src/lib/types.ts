@@ -1,5 +1,15 @@
 export type AuthType = "oauth" | "app-password" | "none";
 
+/** Sanitize a user-supplied URL: only allow http/https schemes */
+export function safeHref(url: string | undefined): string {
+	if (!url) return "#";
+	try {
+		const parsed = new URL(url);
+		if (parsed.protocol === "http:" || parsed.protocol === "https:") return url;
+	} catch { /* invalid URL */ }
+	return "#";
+}
+
 export interface Project {
 	id: string;
 	slug: string;

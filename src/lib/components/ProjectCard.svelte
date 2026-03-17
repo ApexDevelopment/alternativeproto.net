@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { Submission } from "$lib/types";
+	import { safeHref } from "$lib/types";
 	import {
 		urlMatchesHandle,
 		hasSubmissionWithUrl,
@@ -136,7 +137,7 @@
 			</div>
 		</div>
 	</a>
-	<p class="project-description">{@html r.description}</p>
+	<p class="project-description">{r.description}</p>
 	<div class="project-tags">
 		{#each tags as tag}
 			<span class="tag">{tag}</span>
@@ -144,7 +145,7 @@
 	</div>
 	<div class="project-links">
 		<a
-			href={r.url}
+			href={safeHref(r.url)}
 			target="_blank"
 			rel="noopener noreferrer"
 			class="btn btn-primary"
@@ -153,7 +154,7 @@
 		</a>
 		{#if r.isOpenSource && r.repositoryUrl}
 			<a
-				href={r.repositoryUrl}
+				href={safeHref(r.repositoryUrl)}
 				target="_blank"
 				rel="noopener noreferrer"
 				class="btn btn-secondary"

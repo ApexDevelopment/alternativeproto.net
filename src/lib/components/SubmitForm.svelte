@@ -170,6 +170,7 @@
 
 		if (!iconFile && !iconWarningShown) {
 			iconWarningShown = true;
+			document.getElementById("project-icon")?.scrollIntoView({ behavior: "smooth", block: "center" });
 			return;
 		}
 
@@ -352,7 +353,7 @@
 						bind:this={tagsInput}
 						bind:value={tagsStr}
 						required
-						placeholder="social, mobile, federation (comma-separated)"
+						placeholder="social, blogging, events (comma-separated)"
 						autocomplete="off"
 						oninput={showSuggestions}
 						onfocus={showSuggestions}
@@ -390,7 +391,7 @@
 					{:else if iconWarningShown && !iconFile}
 						Submit Anyway
 					{:else}
-						Submit for Review
+						Submit
 					{/if}
 				</button>
 			</div>
