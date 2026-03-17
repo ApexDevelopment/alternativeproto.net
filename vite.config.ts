@@ -42,6 +42,14 @@ function backendPlugin(): Plugin {
 			await db.initDb();
 			startJetstream();
 
+			// Relay backfill (runs in background)
+			const relayUrl = process.env.RELAY_URL;
+			if (relayUrl) {
+				db.backfillFromRelay(relayUrl, transferLabelsForClaim).catch((e) =>
+					console.error("[relay-backfill] Unhandled error:", e),
+				);
+			}
+
 			// API middleware for dev
 			server.middlewares.use(async (req, res, next) => {
 				const url = new URL(req.url || "/", "http://localhost");

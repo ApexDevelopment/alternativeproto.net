@@ -2,7 +2,7 @@ import { createServer } from "node:http";
 import { readFile, stat } from "node:fs/promises";
 import { join, extname } from "node:path";
 import { startLabeler, DEFAULT_LABELER_PORT } from "./labeler-util";
-import { initDb, getAllSubmissions, getSubmissionByDidRkey, dbRowToSubmission, backfillDid, getCachedBlob, cacheBlobFromPds, resolvePds } from "./db";
+import { initDb, getAllSubmissions, getSubmissionByDidRkey, dbRowToSubmission, backfillDid, getCachedBlob, cacheBlobFromPds, resolvePds, backfillFromRelay } from "./db";
 import { transferLabelsForClaim } from "./jetstream";
 import { startJetstream } from "./jetstream";
 
@@ -24,6 +24,14 @@ if (!labeler) {
 // Initialize database and start Jetstream consumer
 await initDb();
 startJetstream();
+
+// Relay backfill (runs in background)
+const relayUrl = process.env.RELAY_URL;
+if (relayUrl) {
+	backfillFromRelay(relayUrl, transferLabelsForClaim).catch((e) =>
+		console.error("[relay-backfill] Unhandled error:", e),
+	);
+}
 
 const MIME_TYPES: Record<string, string> = {
 	".html": "text/html; charset=utf-8",

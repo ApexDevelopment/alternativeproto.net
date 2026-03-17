@@ -96,6 +96,30 @@ export async function upsertSubmission(
 			record = EXCLUDED.record,
 			indexed_at = NOW()
 	`;
+
+	// Clean up older records from the same DID with the same URL but a different rkey.
+	// This handles the case where a third-party tool "edits" by creating a new record
+	// (new rkey) while the delete of the old one may not have been received yet.
+	// Preserve attested records (handle matches URL hostname) — never delete those
+	// in favour of a non-attested duplicate.
+	const url = record.url as string | undefined;
+	if (url) {
+		const dupes = await sql<DbSubmission[]>`
+			SELECT * FROM submissions
+			WHERE did = ${did}
+				AND record->>'url' = ${url}
+				AND uri != ${uri}
+		`;
+		for (const dupe of dupes) {
+			const dupeUrl = (dupe.record as Record<string, unknown>).url as string | undefined;
+			if (dupe.handle && dupeUrl && handleMatchesUrl(dupe.handle, dupeUrl)) {
+				// This duplicate is attested — keep it and remove the incoming one instead
+				await sql`DELETE FROM submissions WHERE uri = ${uri}`;
+				return;
+			}
+			await sql`DELETE FROM submissions WHERE uri = ${dupe.uri}`;
+		}
+	}
 }
 
 export async function deleteSubmission(uri: string) {
@@ -494,4 +518,91 @@ export function dbRowToSubmission(row: DbSubmission) {
 		iconUrl,
 		...(attested ? { attestedBy: attested } : {}),
 	};
+}
+
+// ---------- Relay backfill ----------
+
+/**
+ * Discover all repos with submission records via a relay's
+ * com.atproto.sync.listReposByCollection endpoint, then backfill each.
+ * Runs in the background (fire-and-forget) so it doesn't block startup.
+ */
+export async function backfillFromRelay(
+	relayUrl: string,
+	onIndex?: (uri: string, handle: string | null, record: Record<string, unknown>) => Promise<void>,
+): Promise<void> {
+	console.log(`[relay-backfill] Starting discovery via ${relayUrl}`);
+	const dids = new Set<string>();
+	let cursor: string | undefined;
+
+	try {
+		do {
+			const params = new URLSearchParams({
+				collection: COLLECTION,
+				limit: "1000",
+			});
+			if (cursor) params.set("cursor", cursor);
+
+			const res = await fetch(
+				`${relayUrl}/xrpc/com.atproto.sync.listReposByCollection?${params}`,
+			);
+			if (!res.ok) {
+				console.error(`[relay-backfill] Relay returned ${res.status}`);
+				return;
+			}
+
+			const data = await res.json();
+			for (const repo of data.repos ?? []) {
+				if (repo.did) dids.add(repo.did);
+			}
+			cursor = data.cursor;
+		} while (cursor);
+
+		console.log(`[relay-backfill] Discovered ${dids.size} repos, indexing...`);
+
+		for (const did of dids) {
+			try {
+				// Bypass rate-limit for startup backfill by calling the
+				// internal indexing logic directly.
+				const { pds: pdsUrl, handle } = await resolveIdentity(did);
+				let recordCursor: string | undefined;
+				let count = 0;
+
+				do {
+					const params = new URLSearchParams({
+						repo: did,
+						collection: COLLECTION,
+						limit: "100",
+					});
+					if (recordCursor) params.set("cursor", recordCursor);
+
+					const res = await fetch(
+						`${pdsUrl}/xrpc/com.atproto.repo.listRecords?${params}`,
+					);
+					if (!res.ok) break;
+
+					const data = await res.json();
+					for (const item of data.records ?? []) {
+						const uri: string = item.uri;
+						const rkey = uri.split("/").pop()!;
+						await upsertSubmission(uri, did, rkey, item.cid, pdsUrl, handle, item.value);
+						cacheSubmissionIcon(did, pdsUrl, item.value).catch(() => {});
+						if (onIndex) {
+							try { await onIndex(uri, handle, item.value); } catch {}
+						}
+						count++;
+					}
+					recordCursor = data.cursor;
+				} while (recordCursor);
+
+				if (count > 0) console.log(`[relay-backfill] Indexed ${count} submissions for ${did}`);
+			} catch (e) {
+				console.error(`[relay-backfill] Failed to backfill ${did}:`, e);
+			}
+		}
+
+		console.log(`[relay-backfill] Complete`);
+	} catch (e) {
+		console.error(`[relay-backfill] Discovery failed:`, e);
+	}
 }
