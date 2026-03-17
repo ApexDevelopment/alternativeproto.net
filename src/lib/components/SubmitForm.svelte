@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { tick } from "svelte";
 	import { X } from "lucide-svelte";
 	import { submitProject } from "$lib/api";
 	import type { SubmissionData, AuthType } from "$lib/types";
@@ -198,6 +199,8 @@
 			const result = await submitProject(data);
 			formMessage = result.message;
 			formMessageType = result.success ? "success" : "error";
+			await tick();
+			document.querySelector(".form-message")?.scrollIntoView({ behavior: "smooth", block: "center" });
 
 			if (result.success) {
 				setTimeout(closeModal, 2000);
@@ -211,6 +214,8 @@
 					: "An error occurred. Please try again.";
 			formMessageType = "error";
 			submitting = false;
+			await tick();
+			document.querySelector(".form-message")?.scrollIntoView({ behavior: "smooth", block: "center" });
 		}
 	}
 </script>
