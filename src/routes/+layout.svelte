@@ -9,7 +9,8 @@
 	import { session } from "$lib/stores/session";
 	import { goto } from "$app/navigation";
 	import { page } from "$app/state";
-	import { getAllTags } from "$lib/data";
+	import { listSubmissions } from "$lib/api";
+	import type { Submission } from "$lib/types";
 	import {
 		ArrowLeft,
 		Plus,
@@ -21,6 +22,10 @@
 	let { children } = $props();
 
 	let showSubmitForm = $state(false);
+	let submissions = $state<Submission[]>([]);
+	let existingTags = $derived(
+		[...new Set(submissions.flatMap((s) => s.record.tags ?? []))].sort(),
+	);
 
 	$effect(() => {
 		// Track route for reactivity
@@ -31,6 +36,11 @@
 
 	onMount(async () => {
 		initializeOAuth();
+
+		// Fetch submissions for tag autocomplete
+		listSubmissions()
+			.then((s) => (submissions = s))
+			.catch(() => {});
 
 		let s = null;
 		if (isOAuthCallback()) {
@@ -112,6 +122,6 @@
 {#if showSubmitForm}
 	<SubmitForm
 		onClose={() => (showSubmitForm = false)}
-		existingTags={getAllTags()}
+		existingTags={existingTags}
 	/>
 {/if}
