@@ -2,7 +2,7 @@ import { createServer } from "node:http";
 import { readFile, stat } from "node:fs/promises";
 import { join, extname } from "node:path";
 import { startLabeler, DEFAULT_LABELER_PORT } from "./labeler-util";
-import { initDb, getAllSubmissions, getSubmissionByDidRkey, dbRowToSubmission, backfillDid } from "./db";
+import { initDb, getAllSubmissions, getSubmissionByDidRkey, dbRowToSubmission, backfillDid, getCachedBlob, cacheBlobFromPds, resolvePds } from "./db";
 import { transferLabelsForClaim } from "./jetstream";
 import { startJetstream } from "./jetstream";
 
@@ -134,6 +134,39 @@ const server = createServer(async (req, res) => {
 				res.end(JSON.stringify({ error: "Invalid request body" }));
 			}
 		});
+		return;
+	}
+
+	// API: serve cached blobs (proxy)
+	const blobMatch = pathname.match(/^\/api\/blob\/([^/]+)\/([^/]+)$/);
+	if (blobMatch && req.method === "GET") {
+		const [, blobDid, blobCid] = blobMatch;
+		const did = decodeURIComponent(blobDid);
+		const cid = decodeURIComponent(blobCid);
+		try {
+			let cached = await getCachedBlob(did, cid);
+			if (!cached) {
+				// Try to fetch and cache on-demand
+				const pds = await resolvePds(did);
+				await cacheBlobFromPds(did, cid, pds);
+				cached = await getCachedBlob(did, cid);
+			}
+			if (!cached) {
+				res.writeHead(404);
+				res.end("Not Found");
+				return;
+			}
+			res.writeHead(200, {
+				"Content-Type": cached.mimeType,
+				"Cache-Control": "public, max-age=31536000, immutable",
+				"Access-Control-Allow-Origin": "*",
+			});
+			res.end(cached.data);
+		} catch (e) {
+			console.error("API error (blob):", e);
+			res.writeHead(500);
+			res.end("Internal server error");
+		}
 		return;
 	}
 

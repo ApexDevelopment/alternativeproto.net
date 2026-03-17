@@ -53,6 +53,16 @@ export async function initDb() {
 			PRIMARY KEY (from_uri, to_uri, label)
 		)
 	`;
+	await sql`
+		CREATE TABLE IF NOT EXISTS blob_cache (
+			did TEXT NOT NULL,
+			cid TEXT NOT NULL,
+			mime_type TEXT NOT NULL,
+			data BYTEA NOT NULL,
+			cached_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+			PRIMARY KEY (did, cid)
+		)
+	`;
 }
 
 export interface DbSubmission {
@@ -249,6 +259,79 @@ export async function recordLabelTransfer(
 	`;
 }
 
+// ---------- Blob cache ----------
+
+export async function getCachedBlob(
+	did: string,
+	cid: string,
+): Promise<{ mimeType: string; data: Buffer } | null> {
+	const sql = getSql();
+	const rows = await sql<{ mime_type: string; data: Buffer }[]>`
+		SELECT mime_type, data FROM blob_cache WHERE did = ${did} AND cid = ${cid}
+	`;
+	if (!rows[0]) return null;
+	return { mimeType: rows[0].mime_type, data: rows[0].data };
+}
+
+export async function cacheBlob(
+	did: string,
+	cid: string,
+	mimeType: string,
+	data: Buffer,
+) {
+	const sql = getSql();
+	await sql`
+		INSERT INTO blob_cache (did, cid, mime_type, data)
+		VALUES (${did}, ${cid}, ${mimeType}, ${data})
+		ON CONFLICT (did, cid) DO NOTHING
+	`;
+}
+
+/**
+ * Fetch a blob from a PDS and cache it locally.
+ * Returns true if cached (or already cached), false on failure.
+ */
+export async function cacheBlobFromPds(
+	did: string,
+	cid: string,
+	pdsUrl: string,
+): Promise<boolean> {
+	// Already cached?
+	const existing = await getCachedBlob(did, cid);
+	if (existing) return true;
+
+	try {
+		const url = `${pdsUrl}/xrpc/com.atproto.sync.getBlob?did=${encodeURIComponent(did)}&cid=${encodeURIComponent(cid)}`;
+		const res = await fetch(url);
+		if (!res.ok) return false;
+
+		const mimeType = res.headers.get("content-type") || "application/octet-stream";
+		const data = Buffer.from(await res.arrayBuffer());
+
+		// Limit to 1 MB to match the lexicon constraint
+		if (data.length > 1_000_000) return false;
+
+		await cacheBlob(did, cid, mimeType, data);
+		return true;
+	} catch (e) {
+		console.error(`[blob-cache] Failed to cache blob ${cid} for ${did}:`, e);
+		return false;
+	}
+}
+
+/** Cache the icon blob for a submission record, if it has one. */
+export async function cacheSubmissionIcon(
+	did: string,
+	pdsUrl: string,
+	record: Record<string, unknown>,
+): Promise<void> {
+	const icon = record.icon as
+		| { ref: { $link: string }; mimeType: string }
+		| undefined;
+	if (!icon?.ref?.$link) return;
+	await cacheBlobFromPds(did, icon.ref.$link, pdsUrl);
+}
+
 // ---------- PDS resolution (shared by jetstream + backfill) ----------
 
 const identityCache = new Map<string, { pds: string; handle: string | null }>();
@@ -360,6 +443,9 @@ export async function backfillDid(
 					handle,
 					item.value,
 				);
+				cacheSubmissionIcon(did, pdsUrl, item.value).catch((e) =>
+					console.error(`[backfill] Failed to cache icon for ${uri}:`, e),
+				);
 				if (onIndex) {
 					try {
 						await onIndex(uri, handle, item.value);
@@ -389,7 +475,7 @@ export function dbRowToSubmission(row: DbSubmission) {
 		| undefined;
 	let iconUrl: string | undefined;
 	if (icon?.ref?.$link) {
-		iconUrl = `${row.pds_url}/xrpc/com.atproto.sync.getBlob?did=${encodeURIComponent(row.did)}&cid=${encodeURIComponent(icon.ref.$link)}`;
+		iconUrl = `/api/blob/${encodeURIComponent(row.did)}/${encodeURIComponent(icon.ref.$link)}`;
 	}
 
 	const url = record.url as string | undefined;

@@ -12,6 +12,7 @@ import {
 	getAdminUpvotesForSubject,
 	hasLabelTransfer,
 	recordLabelTransfer,
+	cacheSubmissionIcon,
 } from "./db";
 import { getLabelerInstance } from "./labeler-util";
 
@@ -190,8 +191,9 @@ export function startJetstream() {
 						try {
 							const { pds, handle } = await resolveIdentity(did);
 							await upsertSubmission(uri, did, rkey, cid, pds, handle, record);
-							console.log(`[jetstream] Indexed ${operation}: ${uri}`);
-							await transferLabelsForClaim(uri, handle, record);
+							console.log(`[jetstream] Indexed ${operation}: ${uri}`);								cacheSubmissionIcon(did, pds, record).catch((e) =>
+									console.error(`[jetstream] Failed to cache icon for ${uri}:`, e),
+								);							await transferLabelsForClaim(uri, handle, record);
 						} catch (e) {
 							console.error(`[jetstream] Failed to index ${uri}:`, e);
 						}

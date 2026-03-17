@@ -111,6 +111,36 @@ function backendPlugin(): Plugin {
 					return;
 				}
 
+				const blobMatch = url.pathname.match(
+					/^\/api\/blob\/([^/]+)\/([^/]+)$/,
+				);
+				if (blobMatch && req.method === "GET") {
+					const [, blobDid, blobCid] = blobMatch;
+					const did = decodeURIComponent(blobDid);
+					const cid = decodeURIComponent(blobCid);
+					try {
+						let cached = await db.getCachedBlob(did, cid);
+						if (!cached) {
+							const pds = await db.resolvePds(did);
+							await db.cacheBlobFromPds(did, cid, pds);
+							cached = await db.getCachedBlob(did, cid);
+						}
+						if (!cached) {
+							res.statusCode = 404;
+							res.end("Not Found");
+							return;
+						}
+						res.setHeader("Content-Type", cached.mimeType);
+						res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+						res.end(cached.data);
+					} catch (e) {
+						console.error("API error (blob):", e);
+						res.statusCode = 500;
+						res.end("Internal server error");
+					}
+					return;
+				}
+
 				next();
 			});
 		},
