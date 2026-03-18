@@ -1,4 +1,4 @@
-import { createServer } from "node:http";
+import { createServer, request as httpRequest } from "node:http";
 import { readFile, stat } from "node:fs/promises";
 import { join, extname } from "node:path";
 import { startLabeler, DEFAULT_LABELER_PORT } from "./labeler-util";
@@ -328,7 +328,7 @@ server.on("upgrade", (req, socket, head) => {
 	const url = new URL(req.url || "/", `http://127.0.0.1:${PORT}`);
 	if (url.pathname === "/xrpc/com.atproto.label.subscribeLabels") {
 		const proxyUrl = `http://127.0.0.1:${LABELER_PORT}${url.pathname}${url.search}`;
-		const proxyReq = require("node:http").request(
+		const proxyReq = httpRequest(
 			proxyUrl,
 			{ method: "GET", headers: req.headers },
 			() => {},
