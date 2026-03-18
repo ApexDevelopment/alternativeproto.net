@@ -124,6 +124,7 @@
 			<a href="https://atproto.com" target="_blank" rel="noopener noreferrer"
 				>AT Protocol</a
 			>
+			— Built by <a href="https://bsky.app/profile/apex.atproto.ceo" target="_blank" rel="noopener noreferrer">Apex</a>
 		</p>
 	</div>
 </footer>
