@@ -1,0 +1,38 @@
+services:
+  app:
+    build: .
+    ports:
+      - "${PORT:-3000}:3000"
+      - "${LABELER_PORT:-14831}:14831"
+    environment:
+      - DATABASE_URL=${DATABASE_URL:-postgresql://alternativeproto:alternativeproto@db:5432/alternativeproto}
+      - JETSTREAM_URL=${JETSTREAM_URL:-wss://jetstream1.us-east.bsky.network}
+      - LABELER_DID=${LABELER_DID}
+      - SIGNING_KEY=${SIGNING_KEY}
+      - ADMIN_DID=${ADMIN_DID}
+      - RELAY_URL=${RELAY_URL:-https://bsky.network}
+      - CONSTELLATION_URL=${CONSTELLATION_URL:-https://constellation.microcosm.blue}
+      - PORT=3000
+      - LABELER_PORT=14831
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  db:
+    image: postgres:18-alpine
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-alternativeproto}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-alternativeproto}
+      - POSTGRES_DB=${POSTGRES_DB:-alternativeproto}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U alternativeproto"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  pgdata:
