@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { Submission } from "$lib/types";
+	import type { DisplayReview } from "$lib/types";
 	import { safeHref } from "$lib/types";
 	import {
 		urlMatchesHandle,
@@ -8,6 +9,7 @@
 		createVote,
 		deleteVote,
 		getExistingVote,
+		fetchReviews,
 	} from "$lib/api";
 	import {
 		LockOpen,
@@ -26,6 +28,9 @@
 		Award,
 		ThumbsUp,
 		ThumbsDown,
+		Pencil,
+		Star,
+		ChevronDown,
 	} from "lucide-svelte";
 	import ReviewForm from "./ReviewForm.svelte";
 	import { onMount } from "svelte";
@@ -35,12 +40,16 @@
 		isSignedIn = false,
 		sessionHandle = "",
 		sessionDid = "",
+		onEdit,
 	}: {
 		submission: Submission;
 		isSignedIn?: boolean;
 		sessionHandle?: string;
 		sessionDid?: string;
+		onEdit?: (submission: Submission) => void;
 	} = $props();
+
+	let canEdit = $derived(!!sessionDid && sessionDid === submission.did);
 
 	let reviewSubmitted = $state(false);
 
@@ -94,7 +103,20 @@
 	let canClaim = $state(false);
 	let claimState = $state<"idle" | "claiming" | "claimed" | "error">("idle");
 
+	// Reviews state
+	let allReviews = $state<DisplayReview[]>([]);
+	let reviewsLoading = $state(true);
+	let visibleCount = $state(3);
+	let visibleReviews = $derived(allReviews.slice(0, visibleCount));
+	let hasMoreReviews = $derived(visibleCount < allReviews.length);
+
 	onMount(async () => {
+		// Fetch reviews
+		fetchReviews(submission.did, submission.rkey)
+			.then((r) => { allReviews = r; })
+			.catch((e) => console.error("Failed to fetch reviews:", e))
+			.finally(() => { reviewsLoading = false; });
+
 		// Restore existing vote from PDS
 		if (isSignedIn) {
 			const existing = await getExistingVote(submission.uri);
@@ -132,6 +154,10 @@
 
 	function handleReviewSuccess() {
 		reviewSubmitted = true;
+	}
+
+	function loadMoreReviews() {
+		visibleCount += 5;
 	}
 </script>
 
@@ -189,6 +215,14 @@
 					{:else}
 						<ShieldCheck size={16} strokeWidth={2.5} /> Claim
 					{/if}
+				</button>
+			{/if}
+			{#if canEdit && onEdit}
+				<button
+					class="btn btn-secondary"
+					onclick={() => onEdit(submission)}
+				>
+					<Pencil size={16} strokeWidth={2.5} /> Edit
 				</button>
 			{/if}
 		</div>
@@ -293,5 +327,37 @@
 			</div>
 		{/if}
 	</div>
+
+	{#if reviewsLoading}
+		<hr class="project-detail-section-divider" />
+		<div class="reviews-loading">
+			<LoaderCircle size={24} strokeWidth={2} class="spinning" />
+			<p>Loading reviews…</p>
+		</div>
+	{:else if allReviews.length > 0}
+		<hr class="project-detail-section-divider" />
+		<div class="reviews-list">
+			<h2><MessageSquare size={24} strokeWidth={2} /> Reviews ({allReviews.length})</h2>
+			{#each visibleReviews as review (review.did + review.rkey)}
+				<div class="review-card">
+					<div class="review-card-header">
+						<span class="review-card-author">@{review.handle ?? review.did}</span>
+						<span class="review-card-stars">
+							{#each Array(5) as _, i}
+								<Star size={14} strokeWidth={2} fill={i < review.rating ? "var(--star-color)" : "none"} color={i < review.rating ? "var(--star-color)" : "var(--text-muted)"} />
+							{/each}
+						</span>
+					</div>
+					<p class="review-card-text">{review.text}</p>
+					<span class="review-card-date">{new Date(review.createdAt).toLocaleDateString()}</span>
+				</div>
+			{/each}
+			{#if hasMoreReviews}
+				<button class="btn btn-secondary load-more-btn" onclick={loadMoreReviews}>
+					<ChevronDown size={16} strokeWidth={2} /> Load more reviews
+				</button>
+			{/if}
+		</div>
+	{/if}
 	</div>
 </div>

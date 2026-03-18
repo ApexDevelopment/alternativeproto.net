@@ -1068,6 +1068,89 @@ a:not(.btn):not(.card-link):not(.link-button):not(.modal-close):not(
 	text-align: center;
 }
 
+/* ── Reviews List ───────────────────────────── */
+.reviews-list {
+	padding: 1.5rem;
+}
+
+.reviews-list h2 {
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+	font-size: 1.05rem;
+	margin-bottom: 1.25rem;
+	color: var(--color-text);
+	font-weight: 700;
+	letter-spacing: -0.02em;
+}
+
+.reviews-loading {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 0.75rem;
+	padding: 2rem 1.5rem;
+	color: var(--color-text-dim);
+	font-size: 0.875rem;
+}
+
+.review-card {
+	padding: 1rem 0;
+	border-bottom: 1px dashed var(--color-border);
+}
+
+.review-card:first-of-type {
+	padding-top: 0;
+}
+
+.review-card:last-of-type {
+	border-bottom: none;
+}
+
+.review-card-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.75rem;
+	margin-bottom: 0.5rem;
+}
+
+.review-card-author {
+	font-size: 0.8rem;
+	font-weight: 600;
+	color: var(--color-text);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	min-width: 0;
+}
+
+.review-card-stars {
+	display: flex;
+	gap: 2px;
+	flex-shrink: 0;
+	--star-color: #f59e0b;
+}
+
+.review-card-text {
+	font-size: 0.875rem;
+	color: var(--color-text-dim);
+	line-height: 1.5;
+	margin: 0 0 0.5rem 0;
+	word-break: break-word;
+}
+
+.review-card-date {
+	font-size: 0.75rem;
+	color: var(--color-text-muted);
+}
+
+.load-more-btn {
+	margin-top: 1rem;
+	width: 100%;
+	justify-content: center;
+}
+
 /* ── Project Card Link ──────────────────────── */
 .project-card-link {
 	display: block;

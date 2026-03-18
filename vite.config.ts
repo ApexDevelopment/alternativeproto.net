@@ -56,8 +56,7 @@ function backendPlugin(): Plugin {
 
 				if (url.pathname === "/api/submissions" && req.method === "GET") {
 					try {
-						const rows = await db.getAllSubmissions();
-						const submissions = rows.map(db.dbRowToSubmission);
+						const submissions = await db.getAllSubmissionsRanked();
 						res.setHeader("Content-Type", "application/json");
 						res.end(JSON.stringify(submissions));
 					} catch (e) {
@@ -116,6 +115,24 @@ function backendPlugin(): Plugin {
 							res.end(JSON.stringify({ error: "Invalid request body" }));
 						}
 					});
+					return;
+				}
+
+				const reviewsMatch = url.pathname.match(
+					/^\/api\/reviews\/([^/]+)\/([^/]+)$/,
+				);
+				if (reviewsMatch && req.method === "GET") {
+					const [, reviewDid, reviewRkey] = reviewsMatch;
+					const subjectUri = `at://${decodeURIComponent(reviewDid)}/net.alternativeproto.submission/${decodeURIComponent(reviewRkey)}`;
+					try {
+						const reviews = await db.getReviewsForSubmission(subjectUri);
+						res.setHeader("Content-Type", "application/json");
+						res.end(JSON.stringify(reviews));
+					} catch (e) {
+						console.error("API error (reviews):", e);
+						res.statusCode = 500;
+						res.end(JSON.stringify({ error: "Internal server error" }));
+					}
 					return;
 				}
 

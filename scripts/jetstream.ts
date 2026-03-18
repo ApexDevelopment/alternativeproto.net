@@ -13,6 +13,9 @@ import {
 	hasLabelTransfer,
 	recordLabelTransfer,
 	cacheSubmissionIcon,
+	upsertReview,
+	deleteReview,
+	REVIEW_COLLECTION_NAME,
 } from "./db";
 import { getLabelerInstance } from "./labeler-util";
 
@@ -145,6 +148,7 @@ export function startJetstream() {
 		const params = new URLSearchParams();
 		params.append("wantedCollections", SUBMISSION_COLLECTION);
 		params.append("wantedCollections", VOTE_COLLECTION);
+		params.append("wantedCollections", REVIEW_COLLECTION_NAME);
 		if (savedCursor) {
 			params.set("cursor", savedCursor.toString());
 		}
@@ -181,7 +185,7 @@ export function startJetstream() {
 
 				if (data.kind !== "commit" || !data.commit) return;
 
-				const { collection, operation, rkey, record, cid } = data.commit;
+				const { collection, operation, rkey, record, cid, rev } = data.commit;
 				const did = data.did;
 
 				if (collection === SUBMISSION_COLLECTION) {
@@ -190,7 +194,7 @@ export function startJetstream() {
 						if (!record || !cid) return;
 						try {
 							const { pds, handle } = await resolveIdentity(did);
-							await upsertSubmission(uri, did, rkey, cid, pds, handle, record);
+							await upsertSubmission(uri, did, rkey, cid, pds, handle, record, rev);
 							console.log(`[jetstream] Indexed ${operation}: ${uri}`);								cacheSubmissionIcon(did, pds, record).catch((e) =>
 									console.error(`[jetstream] Failed to cache icon for ${uri}:`, e),
 								);							await transferLabelsForClaim(uri, handle, record);
@@ -207,6 +211,24 @@ export function startJetstream() {
 					}
 				} else if (collection === VOTE_COLLECTION) {
 					await handleVote(did, rkey, operation, record);
+				} else if (collection === REVIEW_COLLECTION_NAME) {
+					if (operation === "create" || operation === "update") {
+						if (!record) return;
+						try {
+							const { handle } = await resolveIdentity(did);
+							await upsertReview(did, rkey, handle, record);
+							console.log(`[jetstream] Indexed review ${operation}: at://${did}/${REVIEW_COLLECTION_NAME}/${rkey}`);
+						} catch (e) {
+							console.error(`[jetstream] Failed to index review at://${did}/${REVIEW_COLLECTION_NAME}/${rkey}:`, e);
+						}
+					} else if (operation === "delete") {
+						try {
+							await deleteReview(did, rkey);
+							console.log(`[jetstream] Deleted review: at://${did}/${REVIEW_COLLECTION_NAME}/${rkey}`);
+						} catch (e) {
+							console.error(`[jetstream] Failed to delete review at://${did}/${REVIEW_COLLECTION_NAME}/${rkey}:`, e);
+						}
+					}
 				}
 			} catch (e) {
 				console.error("[jetstream] Error processing message:", e);

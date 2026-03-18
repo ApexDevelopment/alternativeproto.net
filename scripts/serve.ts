@@ -2,7 +2,7 @@ import { createServer } from "node:http";
 import { readFile, stat } from "node:fs/promises";
 import { join, extname } from "node:path";
 import { startLabeler, DEFAULT_LABELER_PORT } from "./labeler-util";
-import { initDb, getAllSubmissions, getSubmissionByDidRkey, dbRowToSubmission, backfillDid, getCachedBlob, cacheBlobFromPds, resolvePds, backfillFromRelay } from "./db";
+import { initDb, getAllSubmissionsRanked, getSubmissionByDidRkey, dbRowToSubmission, backfillDid, getCachedBlob, cacheBlobFromPds, resolvePds, backfillFromRelay, getReviewsForSubmission } from "./db";
 import { transferLabelsForClaim } from "./jetstream";
 import { startJetstream } from "./jetstream";
 
@@ -77,8 +77,7 @@ const server = createServer(async (req, res) => {
 	// API: list all submissions
 	if (pathname === "/api/submissions" && req.method === "GET") {
 		try {
-			const rows = await getAllSubmissions();
-			const submissions = rows.map(dbRowToSubmission);
+			const submissions = await getAllSubmissionsRanked();
 			res.writeHead(200, {
 				"Content-Type": "application/json",
 				"Access-Control-Allow-Origin": "*",
@@ -142,6 +141,28 @@ const server = createServer(async (req, res) => {
 				res.end(JSON.stringify({ error: "Invalid request body" }));
 			}
 		});
+		return;
+	}
+
+	// API: fetch reviews for a submission
+	const reviewsMatch = pathname.match(
+		/^\/api\/reviews\/([^/]+)\/([^/]+)$/,
+	);
+	if (reviewsMatch && req.method === "GET") {
+		const [, reviewDid, reviewRkey] = reviewsMatch;
+		const subjectUri = `at://${decodeURIComponent(reviewDid)}/net.alternativeproto.submission/${decodeURIComponent(reviewRkey)}`;
+		try {
+			const reviews = await getReviewsForSubmission(subjectUri);
+			res.writeHead(200, {
+				"Content-Type": "application/json",
+				"Access-Control-Allow-Origin": "*",
+			});
+			res.end(JSON.stringify(reviews));
+		} catch (e) {
+			console.error("API error (reviews):", e);
+			res.writeHead(500, { "Content-Type": "application/json" });
+			res.end(JSON.stringify({ error: "Internal server error" }));
+		}
 		return;
 	}
 

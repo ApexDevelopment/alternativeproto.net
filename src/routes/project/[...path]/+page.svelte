@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { getSubmission } from "$lib/api";
 	import { session } from "$lib/stores/session";
+	import { editingSubmission } from "$lib/stores/session";
 	import { validateSession } from "$lib/auth/oauth";
 	import { onMount } from "svelte";
 	import ProjectDetail from "$lib/components/ProjectDetail.svelte";
@@ -36,6 +37,7 @@
 		isSignedIn={$session !== null}
 		sessionHandle={$session?.handle ?? ""}
 		sessionDid={$session?.did ?? ""}
+		onEdit={(s) => editingSubmission.set(s)}
 	/>
 {:else}
 	<div class="not-found">

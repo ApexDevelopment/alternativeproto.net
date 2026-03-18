@@ -7,6 +7,7 @@
 		isOAuthCallback,
 	} from "$lib/auth/oauth";
 	import { session } from "$lib/stores/session";
+	import { editingSubmission } from "$lib/stores/session";
 	import { goto } from "$app/navigation";
 	import { page } from "$app/state";
 	import { listSubmissions } from "$lib/api";
@@ -22,7 +23,15 @@
 	let { children } = $props();
 
 	let showSubmitForm = $state(false);
+	let editSub = $state<Submission | null>(null);
 	let submissions = $state<Submission[]>([]);
+
+	editingSubmission.subscribe((s) => {
+		if (s) {
+			editSub = s;
+			showSubmitForm = true;
+		}
+	});
 	let existingTags = $derived(
 		[...new Set(submissions.flatMap((s) => s.record.tags ?? []))].sort(),
 	);
@@ -121,7 +130,8 @@
 
 {#if showSubmitForm}
 	<SubmitForm
-		onClose={() => (showSubmitForm = false)}
+		onClose={() => { showSubmitForm = false; editSub = null; editingSubmission.set(null); }}
 		existingTags={existingTags}
+		editSubmission={editSub ?? undefined}
 	/>
 {/if}

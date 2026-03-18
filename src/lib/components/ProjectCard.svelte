@@ -19,6 +19,7 @@
 		Check,
 		BadgeCheck,
 		Award,
+		Pencil,
 	} from "lucide-svelte";
 	import { onMount } from "svelte";
 
@@ -26,11 +27,15 @@
 		submission,
 		sessionHandle = "",
 		sessionDid = "",
+		onEdit,
 	}: {
 		submission: Submission;
 		sessionHandle?: string;
 		sessionDid?: string;
+		onEdit?: (submission: Submission) => void;
 	} = $props();
+
+	let canEdit = $derived(!!sessionDid && sessionDid === submission.did);
 
 	let r = $derived(submission.record);
 	let alts = $derived(r.alternativeTo ?? []);
@@ -179,6 +184,14 @@
 				{:else}
 					<ShieldCheck size={14} strokeWidth={2.5} /> Claim Project
 				{/if}
+			</button>
+		{/if}
+		{#if canEdit && onEdit}
+			<button
+				class="btn btn-secondary"
+				onclick={(e: MouseEvent) => { e.stopPropagation(); e.preventDefault(); onEdit(submission); }}
+			>
+				<Pencil size={14} strokeWidth={2.5} /> Edit
 			</button>
 		{/if}
 	</div>

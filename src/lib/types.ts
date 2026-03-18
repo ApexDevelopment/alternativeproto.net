@@ -57,6 +57,8 @@ export interface Submission {
 	attestedBy?: string;
 	/** Approval status based on labeler labels */
 	approval?: "verified" | "community-verified";
+	/** Number of upvotes (backlinks from Constellation) */
+	upvotes?: number;
 }
 
 export interface SubmissionData {
@@ -83,4 +85,14 @@ export interface Review {
 	text: string;
 	isGoodAlternative: boolean;
 	createdAt: string; // ISO datetime
+}
+
+/** A review as returned by the backend API (fetched via Constellation) */
+export interface DisplayReview {
+	did: string;
+	rkey: string;
+	handle: string | null;
+	rating: number;
+	text: string;
+	createdAt: string;
 }

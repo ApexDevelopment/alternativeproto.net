@@ -7,6 +7,7 @@
 	import { SearchX } from "lucide-svelte";
 	import { onMount } from "svelte";
 	import { session } from "$lib/stores/session";
+	import { editingSubmission } from "$lib/stores/session";
 
 	let submissions = $state<Submission[]>([]);
 
@@ -100,6 +101,7 @@
 				{submission}
 				sessionHandle={$session?.handle ?? ""}
 				sessionDid={$session?.did ?? ""}
+				onEdit={(s) => editingSubmission.set(s)}
 			/>
 		{/each}
 	{/if}

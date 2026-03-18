@@ -1,4 +1,5 @@
 import postgres from "postgres";
+import { Profanity } from "@2toad/profanity";
 
 const COLLECTION = "net.alternativeproto.submission";
 
@@ -24,12 +25,14 @@ export async function initDb() {
 			pds_url TEXT NOT NULL,
 			handle TEXT,
 			record JSONB NOT NULL,
+			rev TEXT,
 			indexed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 		)
 	`;
 	await sql`CREATE INDEX IF NOT EXISTS idx_submissions_did ON submissions(did)`;
-	// Migration: add handle column if missing (existing installs)
+	// Migration: add columns if missing (existing installs)
 	await sql`ALTER TABLE submissions ADD COLUMN IF NOT EXISTS handle TEXT`;
+	await sql`ALTER TABLE submissions ADD COLUMN IF NOT EXISTS rev TEXT`;
 	await sql`
 		CREATE TABLE IF NOT EXISTS jetstream_cursor (
 			id INTEGER PRIMARY KEY DEFAULT 1,
@@ -63,6 +66,20 @@ export async function initDb() {
 			PRIMARY KEY (did, cid)
 		)
 	`;
+	await sql`
+		CREATE TABLE IF NOT EXISTS reviews (
+			did TEXT NOT NULL,
+			rkey TEXT NOT NULL,
+			subject_uri TEXT NOT NULL,
+			handle TEXT,
+			rating INTEGER NOT NULL,
+			text TEXT NOT NULL,
+			created_at TEXT NOT NULL,
+			indexed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+			PRIMARY KEY (did, rkey)
+		)
+	`;
+	await sql`CREATE INDEX IF NOT EXISTS idx_reviews_subject ON reviews(subject_uri)`;
 }
 
 export interface DbSubmission {
@@ -73,6 +90,7 @@ export interface DbSubmission {
 	pds_url: string;
 	handle: string | null;
 	record: Record<string, unknown>;
+	rev: string | null;
 	indexed_at: Date;
 }
 
@@ -84,18 +102,26 @@ export async function upsertSubmission(
 	pdsUrl: string,
 	handle: string | null,
 	record: Record<string, unknown>,
+	rev: string | null = null,
 ) {
 	const sql = getSql();
-	await sql`
-		INSERT INTO submissions (uri, did, rkey, cid, pds_url, handle, record)
-		VALUES (${uri}, ${did}, ${rkey}, ${cid}, ${pdsUrl}, ${handle}, ${sql.json(record)})
+	const result = await sql`
+		INSERT INTO submissions (uri, did, rkey, cid, pds_url, handle, record, rev)
+		VALUES (${uri}, ${did}, ${rkey}, ${cid}, ${pdsUrl}, ${handle}, ${sql.json(record)}, ${rev})
 		ON CONFLICT (uri) DO UPDATE SET
 			cid = EXCLUDED.cid,
 			pds_url = EXCLUDED.pds_url,
 			handle = EXCLUDED.handle,
 			record = EXCLUDED.record,
+			rev = EXCLUDED.rev,
 			indexed_at = NOW()
+		WHERE submissions.rev IS NULL
+			OR EXCLUDED.rev IS NULL
+			OR EXCLUDED.rev >= submissions.rev
 	`;
+
+	// If the row was not inserted/updated (stale rev), skip cleanup
+	if (result.count === 0) return;
 
 	// Clean up older records from the same DID with the same URL but a different rkey.
 	// This handles the case where a third-party tool "edits" by creating a new record
@@ -484,6 +510,37 @@ export async function backfillDid(
 
 		backfillLastRun.set(did, now);
 		console.log(`[backfill] Indexed ${count} submissions for ${did}`);
+
+		// Also backfill reviews
+		let reviewCursor: string | undefined;
+		let reviewCount = 0;
+		do {
+			const reviewParams = new URLSearchParams({
+				repo: did,
+				collection: REVIEW_COLLECTION_NAME,
+				limit: "100",
+			});
+			if (reviewCursor) reviewParams.set("cursor", reviewCursor);
+
+			const res = await fetch(
+				`${pdsUrl}/xrpc/com.atproto.repo.listRecords?${reviewParams}`,
+			);
+			if (!res.ok) break;
+
+			const data = await res.json();
+			for (const item of data.records ?? []) {
+				const uri: string = item.uri;
+				const rkey = uri.split("/").pop()!;
+				await upsertReview(did, rkey, handle, item.value);
+				reviewCount++;
+			}
+			reviewCursor = data.cursor;
+		} while (reviewCursor);
+
+		if (reviewCount > 0) {
+			console.log(`[backfill] Indexed ${reviewCount} reviews for ${did}`);
+		}
+
 		return { status: "ok", message: `Indexed ${count} submissions` };
 	} catch (e) {
 		console.error(`[backfill] Error for ${did}:`, e);
@@ -606,3 +663,182 @@ export async function backfillFromRelay(
 		console.error(`[relay-backfill] Discovery failed:`, e);
 	}
 }
+
+// ---------- Constellation (upvote counts) ----------
+
+const VOTE_COLLECTION = "net.alternativeproto.vote";
+const VOTE_PATH = ".subject.uri";
+const DEFAULT_CONSTELLATION_URL = "https://constellation.microcosm.blue";
+
+function getConstellationUrl(): string {
+	return (process.env.CONSTELLATION_URL || DEFAULT_CONSTELLATION_URL).replace(/\/+$/, "");
+}
+
+const voteCountCache = new Map<string, { count: number; fetchedAt: number }>();
+const VOTE_COUNT_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+async function fetchVoteCount(uri: string): Promise<number> {
+	const cached = voteCountCache.get(uri);
+	if (cached && Date.now() - cached.fetchedAt < VOTE_COUNT_TTL_MS) {
+		return cached.count;
+	}
+
+	try {
+		const base = getConstellationUrl();
+		const params = new URLSearchParams({
+			target: uri,
+			collection: VOTE_COLLECTION,
+			path: VOTE_PATH,
+		});
+		const res = await fetch(`${base}/links/count/distinct-dids?${params}`, {
+			headers: {
+				Accept: "application/json",
+				"User-Agent": "alternativeproto/1.0 (@alternativeproto.net)",
+			},
+		});
+		if (!res.ok) return cached?.count ?? 0;
+		const data = await res.json();
+		const count = typeof data.total === "number" ? data.total : 0;
+		voteCountCache.set(uri, { count, fetchedAt: Date.now() });
+		return count;
+	} catch {
+		return cached?.count ?? 0;
+	}
+}
+
+export async function fetchVoteCounts(uris: string[]): Promise<Map<string, number>> {
+	const results = new Map<string, number>();
+	await Promise.all(
+		uris.map(async (uri) => {
+			results.set(uri, await fetchVoteCount(uri));
+		}),
+	);
+	return results;
+}
+
+/**
+ * Return all submissions with upvote counts, deduplicating by URL.
+ * When multiple submissions share the same URL, prefer the attested version
+ * and sum vote counts across all URIs for the same URL.
+ */
+export async function getAllSubmissionsRanked() {
+	const sql = getSql();
+	const rows = await sql<DbSubmission[]>`SELECT * FROM submissions ORDER BY indexed_at DESC`;
+
+	// Fetch vote counts for ALL URIs (including duplicates)
+	const voteCounts = await fetchVoteCounts(rows.map((r) => r.uri));
+
+	// Group by URL, pick attested version, sum votes across duplicates
+	const byUrl = new Map<string, { row: DbSubmission; upvotes: number }>();
+	for (const row of rows) {
+		const url = (row.record as Record<string, unknown>).url as string | undefined;
+		const rowVotes = voteCounts.get(row.uri) ?? 0;
+
+		if (!url) {
+			byUrl.set(row.uri, { row, upvotes: rowVotes });
+			continue;
+		}
+
+		const existing = byUrl.get(url);
+		if (!existing) {
+			byUrl.set(url, { row, upvotes: rowVotes });
+			continue;
+		}
+
+		// Sum votes from this duplicate
+		existing.upvotes += rowVotes;
+
+		// Prefer the submission whose handle matches the URL hostname
+		if (row.handle && handleMatchesUrl(row.handle, url)) {
+			byUrl.set(url, { row, upvotes: existing.upvotes });
+		}
+	}
+
+	return [...byUrl.values()].map(({ row, upvotes }) => ({
+		...dbRowToSubmission(row),
+		upvotes,
+	}));
+}
+
+// ---------- Reviews ----------
+
+const REVIEW_COLLECTION_NAME = "net.alternativeproto.review";
+
+const profanity = new Profanity();
+
+export interface ApiReview {
+	did: string;
+	rkey: string;
+	handle: string | null;
+	rating: number;
+	text: string;
+	createdAt: string;
+}
+
+export async function upsertReview(
+	did: string,
+	rkey: string,
+	handle: string | null,
+	record: Record<string, unknown>,
+) {
+	const subjectUri = record.projectId as string | undefined;
+	if (!subjectUri) return;
+
+	const rating = typeof record.rating === "number"
+		? Math.min(5, Math.max(1, Math.round(record.rating)))
+		: null;
+	if (rating === null) return;
+
+	const text = typeof record.text === "string" ? record.text : "";
+	const createdAt = (record.createdAt as string) ?? new Date().toISOString();
+
+	const sql = getSql();
+	await sql`
+		INSERT INTO reviews (did, rkey, subject_uri, handle, rating, text, created_at)
+		VALUES (${did}, ${rkey}, ${subjectUri}, ${handle}, ${rating}, ${text}, ${createdAt})
+		ON CONFLICT (did, rkey) DO UPDATE SET
+			subject_uri = EXCLUDED.subject_uri,
+			handle = EXCLUDED.handle,
+			rating = EXCLUDED.rating,
+			text = EXCLUDED.text,
+			created_at = EXCLUDED.created_at,
+			indexed_at = NOW()
+	`;
+}
+
+export async function deleteReview(did: string, rkey: string) {
+	const sql = getSql();
+	await sql`DELETE FROM reviews WHERE did = ${did} AND rkey = ${rkey}`;
+}
+
+/**
+ * Get reviews for a submission URI from the database.
+ * Deduplicates by DID (one review per user, latest rkey wins).
+ * Censors profane text.
+ */
+export async function getReviewsForSubmission(subjectUri: string): Promise<ApiReview[]> {
+	const sql = getSql();
+
+	// Deduplicate by DID: keep only the row with the latest rkey per user
+	const rows = await sql<{ did: string; rkey: string; handle: string | null; rating: number; text: string; created_at: string }[]>`
+		SELECT DISTINCT ON (did) did, rkey, handle, rating, text, created_at
+		FROM reviews
+		WHERE subject_uri = ${subjectUri}
+		ORDER BY did, rkey DESC
+	`;
+
+	const reviews: ApiReview[] = rows.map((row) => ({
+		did: row.did,
+		rkey: row.rkey,
+		handle: row.handle,
+		rating: row.rating,
+		text: profanity.censor(row.text),
+		createdAt: row.created_at,
+	}));
+
+	// Sort newest first
+	reviews.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+	return reviews;
+}
+
+export { REVIEW_COLLECTION_NAME };

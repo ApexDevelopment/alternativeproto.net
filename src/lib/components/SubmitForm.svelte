@@ -1,28 +1,38 @@
 <script lang="ts">
 	import { tick } from "svelte";
 	import { X } from "lucide-svelte";
-	import { submitProject } from "$lib/api";
-	import type { SubmissionData, AuthType } from "$lib/types";
+	import { submitProject, updateProject } from "$lib/api";
+	import type { SubmissionData, AuthType, Submission } from "$lib/types";
 
 	let {
 		onClose,
 		existingTags = [],
+		editSubmission,
 	}: {
 		onClose: () => void;
 		existingTags?: string[];
+		editSubmission?: Submission;
 	} = $props();
 
-	let name = $state("");
-	let description = $state("");
+	let isEdit = $derived(!!editSubmission);
+	let editRecord = $derived(editSubmission?.record);
+
+	// Capture initial edit values (intentionally non-reactive — we only
+	// want the values at mount time to pre-populate form fields)
+	// svelte-ignore state_referenced_locally
+	const initialEdit = editSubmission;
+
+	let name = $state(initialEdit?.record.name ?? "");
+	let description = $state(initialEdit?.record.description ?? "");
 	let iconFile = $state<File | null>(null);
-	let iconPreviewUrl = $state("");
+	let iconPreviewUrl = $state(initialEdit?.iconUrl ?? "");
 	let iconWarningShown = $state(false);
-	let url = $state("");
-	let alternativeToStr = $state("");
-	let isOpenSource = $state(false);
-	let repositoryUrl = $state("");
-	let authType = $state<AuthType>("oauth");
-	let tagsStr = $state("");
+	let url = $state(initialEdit?.record.url ?? "");
+	let alternativeToStr = $state((initialEdit?.record.alternativeTo ?? []).join(", "));
+	let isOpenSource = $state(initialEdit?.record.isOpenSource ?? false);
+	let repositoryUrl = $state(initialEdit?.record.repositoryUrl ?? "");
+	let authType = $state<AuthType>((initialEdit?.record.authType as AuthType) ?? "oauth");
+	let tagsStr = $state((initialEdit?.record.tags ?? []).join(", "));
 
 	let submitting = $state(false);
 	let formMessage = $state("");
@@ -169,7 +179,8 @@
 	async function handleSubmit(e: SubmitEvent) {
 		e.preventDefault();
 
-		if (!iconFile && !iconWarningShown) {
+		const hasExistingIcon = isEdit && !!editRecord?.icon;
+		if (!iconFile && !iconWarningShown && !hasExistingIcon) {
 			iconWarningShown = true;
 			document.getElementById("project-icon")?.scrollIntoView({ behavior: "smooth", block: "center" });
 			return;
@@ -196,7 +207,9 @@
 		};
 
 		try {
-			const result = await submitProject(data);
+			const result = isEdit
+				? await updateProject(editSubmission!.rkey, data, editRecord?.icon)
+				: await submitProject(data);
 			formMessage = result.message;
 			formMessageType = result.success ? "success" : "error";
 			await tick();
@@ -231,7 +244,7 @@
 >
 	<div class="modal">
 		<div class="modal-header">
-			<h2>Submit a Project</h2>
+			<h2>{isEdit ? 'Edit Project' : 'Submit a Project'}</h2>
 			<button class="modal-close" aria-label="Close" onclick={closeModal}>
 				<X size={20} strokeWidth={2} />
 			</button>
@@ -392,11 +405,11 @@
 				</button>
 				<button type="submit" class="btn btn-primary" disabled={submitting}>
 					{#if submitting}
-						Submitting...
-					{:else if iconWarningShown && !iconFile}
+						{isEdit ? 'Saving...' : 'Submitting...'}
+					{:else if iconWarningShown && !iconFile && !isEdit}
 						Submit Anyway
 					{:else}
-						Submit
+						{isEdit ? 'Save Changes' : 'Submit'}
 					{/if}
 				</button>
 			</div>

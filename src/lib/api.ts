@@ -1,4 +1,4 @@
-import type { SubmissionData, Submission, SubmissionRecord } from "./types";
+import type { SubmissionData, Submission, SubmissionRecord, DisplayReview } from "./types";
 import {
 	getAuthenticatedClient,
 	getStoredSessionDid,
@@ -84,6 +84,24 @@ export async function listSubmissions(): Promise<Submission[]> {
 		const a = approvals.get(s.uri);
 		if (a) s.approval = a;
 	}
+
+	// Sort by descending priority: attested > verified > community-verified > upvotes
+	submissions.sort((a, b) => {
+		const attestA = a.attestedBy ? 1 : 0;
+		const attestB = b.attestedBy ? 1 : 0;
+		if (attestA !== attestB) return attestB - attestA;
+
+		const verifiedA = a.approval === "verified" ? 1 : 0;
+		const verifiedB = b.approval === "verified" ? 1 : 0;
+		if (verifiedA !== verifiedB) return verifiedB - verifiedA;
+
+		const communityA = a.approval === "community-verified" ? 1 : 0;
+		const communityB = b.approval === "community-verified" ? 1 : 0;
+		if (communityA !== communityB) return communityB - communityA;
+
+		return (b.upvotes ?? 0) - (a.upvotes ?? 0);
+	});
+
 	return submissions;
 }
 
@@ -104,6 +122,13 @@ export async function getSubmission(
 	const a = approvals.get(submission.uri);
 	if (a) submission.approval = a;
 	return submission;
+}
+
+/** Fetch reviews for a submission from the backend */
+export async function fetchReviews(did: string, rkey: string): Promise<DisplayReview[]> {
+	const res = await fetch(`/api/reviews/${encodeURIComponent(did)}/${encodeURIComponent(rkey)}`);
+	if (!res.ok) return [];
+	return res.json();
 }
 
 export interface ReviewRecord {
@@ -267,6 +292,74 @@ export async function submitProject(
 			throw new Error("Your session has expired. Please sign in again.");
 		}
 		throw new Error("Failed to submit project. Please try again.");
+	}
+}
+
+export async function updateProject(
+	rkey: string,
+	data: SubmissionData,
+	existingIconRef?: unknown,
+): Promise<{ success: boolean; message: string }> {
+	const { client, did } = await getClientAndDid();
+
+	let iconBlobRef: unknown = existingIconRef;
+
+	if (data.iconFile) {
+		try {
+			iconBlobRef = await uploadBlob(client, data.iconFile);
+		} catch (e) {
+			console.error("Failed to upload icon:", e);
+			throw new Error("Failed to upload icon. Please try again.");
+		}
+	}
+
+	const record: Record<string, unknown> = {
+		$type: SUBMISSION_COLLECTION,
+		name: data.name,
+		description: data.description,
+		url: data.url,
+		alternativeTo: data.alternativeTo,
+		isOpenSource: data.isOpenSource,
+		authType: data.authType,
+		tags: data.tags,
+		createdAt: new Date().toISOString(),
+	};
+
+	if (iconBlobRef) {
+		record.icon = iconBlobRef;
+	}
+
+	if (data.repositoryUrl) {
+		record.repositoryUrl = data.repositoryUrl;
+	}
+
+	try {
+		const response = await client.post("com.atproto.repo.putRecord", {
+			input: {
+				repo: did,
+				collection: SUBMISSION_COLLECTION,
+				rkey,
+				record,
+			},
+		});
+
+		if (response.ok) {
+			return {
+				success: true,
+				message: "Your submission has been updated!",
+			};
+		}
+
+		return {
+			success: false,
+			message: "Failed to update submission. Please try again.",
+		};
+	} catch (e) {
+		console.error("Failed to update project:", e);
+		if (e instanceof Error && e.message.includes("auth")) {
+			throw new Error("Your session has expired. Please sign in again.");
+		}
+		throw new Error("Failed to update project. Please try again.");
 	}
 }
 

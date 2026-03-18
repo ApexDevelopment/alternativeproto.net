@@ -25,6 +25,7 @@
 		"vite": "^7.2.4"
 	},
 	"dependencies": {
+		"@2toad/profanity": "^3.2.0",
 		"@atcute/atproto": "^3.1.10",
 		"@atcute/client": "^4.2.1",
 		"@atcute/identity-resolver": "^1.2.2",
