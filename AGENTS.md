@@ -115,14 +115,6 @@ lexicons/
 - CSS is global in `src/style.css`, using CSS custom properties for theming (dark theme)
 - The `SearchBar` component exports its `SearchFilters` type for parent consumption
 
-## Conventions
-
-- Imports from `src/lib/` use the `$lib` alias (e.g., `import { projects } from "$lib/data"`)
-- Components accept typed props via `$props()` destructuring
-- Icons are imported directly from `lucide-svelte` as components (e.g., `<ArrowLeft size={18} />`)
-- CSS is global in `src/style.css`, using CSS custom properties for theming (dark theme)
-- The `SearchBar` component exports its `SearchFilters` type for parent consumption
-
 ## Quality Gate
 
 **`npm run check` must report 0 errors and 0 warnings before a task is considered finished.** After making any changes to `.svelte`, `.ts`, or `.js` files, run `npm run check` and resolve all diagnostics. Common Svelte 5 pitfalls to watch for:
