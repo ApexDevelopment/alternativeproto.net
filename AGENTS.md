@@ -38,6 +38,7 @@
 | `ADMIN_DID` | DID of the admin account whose upvotes apply `alternativeproto-verified` labels |
 | `RELAY_URL` | Relay HTTP endpoint for startup backfill (e.g. `https://bsky.network`) |
 | `CONSTELLATION_URL` | Constellation API endpoint for vote counting (default: `https://constellation.microcosm.blue`) |
+| `PUBLIC_URL` | Public base URL for OAuth metadata (e.g. `https://alternativeproto.net`). If unset, serves static file. |
 | `PORT` | Production server port (default: `3000`) |
 | `LABELER_PORT` | Labeler port (default: `14831`) |
 

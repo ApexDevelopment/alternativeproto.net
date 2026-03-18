@@ -12,6 +12,7 @@ services:
       - ADMIN_DID=${ADMIN_DID}
       - RELAY_URL=${RELAY_URL:-https://bsky.network}
       - CONSTELLATION_URL=${CONSTELLATION_URL:-https://constellation.microcosm.blue}
+      - PUBLIC_URL=${PUBLIC_URL:-https://alternativeproto.net}
       - PORT=3000
       - LABELER_PORT=14831
     depends_on:

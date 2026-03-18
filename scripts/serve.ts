@@ -275,6 +275,30 @@ const server = createServer(async (req, res) => {
 		return;
 	}
 
+	// Dynamic OAuth client metadata (uses PUBLIC_URL for production)
+	if (pathname === "/oauth-client-metadata.json" && req.method === "GET") {
+		const publicUrl = process.env.PUBLIC_URL;
+		if (publicUrl) {
+			const metadata = {
+				client_id: `${publicUrl}/oauth-client-metadata.json`,
+				client_name: "AlternativeProto",
+				client_uri: publicUrl,
+				logo_uri: `${publicUrl}/icons/logo.png`,
+				redirect_uris: [`${publicUrl}/oauth/callback/`],
+				scope: "atproto blob:*/* repo:net.alternativeproto.review repo:net.alternativeproto.submission repo:net.alternativeproto.vote",
+				grant_types: ["authorization_code", "refresh_token"],
+				response_types: ["code"],
+				application_type: "web",
+				dpop_bound_access_tokens: true,
+				token_endpoint_auth_method: "none",
+			};
+			res.writeHead(200, { "Content-Type": "application/json" });
+			res.end(JSON.stringify(metadata, null, "\t"));
+			return;
+		}
+		// Fall through to static file if PUBLIC_URL not set
+	}
+
 	// Try to serve static file
 	const result =
 		(await serveStatic(pathname)) ||

@@ -4,7 +4,7 @@
 	"client_uri": "http://localhost:5173",
 	"logo_uri": "http://localhost:5173/icons/logo.png",
 	"redirect_uris": ["http://localhost:5173/oauth/callback/"],
-	"scope": "atproto repo:net.alternativeproto.review",
+	"scope": "atproto blob:*/* repo:net.alternativeproto.review repo:net.alternativeproto.submission repo:net.alternativeproto.vote",
 	"grant_types": ["authorization_code", "refresh_token"],
 	"response_types": ["code"],
 	"application_type": "web",
