@@ -123,7 +123,7 @@ function backendPlugin(): Plugin {
 				);
 				if (reviewsMatch && req.method === "GET") {
 					const [, reviewDid, reviewRkey] = reviewsMatch;
-					const subjectUri = `at://${decodeURIComponent(reviewDid)}/net.alternativeproto.submission/${decodeURIComponent(reviewRkey)}`;
+					const subjectUri = `at://${decodeURIComponent(reviewDid)}/${db.SUBMISSION_COLLECTION}/${decodeURIComponent(reviewRkey)}`;
 					try {
 						const reviews = await db.getReviewsForSubmission(subjectUri);
 						res.setHeader("Content-Type", "application/json");

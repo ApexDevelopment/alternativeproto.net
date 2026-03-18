@@ -79,8 +79,7 @@ scripts/
 ├── db.ts                 # Postgres module: schema, CRUD, PDS/identity resolution, backfill, deduplication
 ├── jetstream.ts          # Jetstream WebSocket consumer: indexes submissions from firehose
 ├── serve.ts              # Production server: static files + API routes + labeler proxy + Jetstream
-├── labeler-util.ts       # Shared labeler startup (used by both Vite plugin and serve.ts)
-└── download-icon.ts      # Utility: download + normalize icons to static/icons/ (uses sharp)
+└── labeler-util.ts       # Shared labeler startup (used by both Vite plugin and serve.ts)
 
 static/                   # Static assets (served at /)
 ├── oauth-client-metadata.json    # OAuth client metadata for production

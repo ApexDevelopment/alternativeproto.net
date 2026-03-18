@@ -2,7 +2,7 @@ import { createServer } from "node:http";
 import { readFile, stat } from "node:fs/promises";
 import { join, extname } from "node:path";
 import { startLabeler, DEFAULT_LABELER_PORT } from "./labeler-util";
-import { initDb, getAllSubmissionsRanked, getSubmissionByDidRkey, dbRowToSubmission, backfillDid, getCachedBlob, cacheBlobFromPds, resolvePds, backfillFromRelay, getReviewsForSubmission } from "./db";
+import { initDb, getAllSubmissionsRanked, getSubmissionByDidRkey, dbRowToSubmission, backfillDid, getCachedBlob, cacheBlobFromPds, resolvePds, backfillFromRelay, getReviewsForSubmission, SUBMISSION_COLLECTION } from "./db";
 import { transferLabelsForClaim } from "./jetstream";
 import { startJetstream } from "./jetstream";
 
@@ -150,7 +150,7 @@ const server = createServer(async (req, res) => {
 	);
 	if (reviewsMatch && req.method === "GET") {
 		const [, reviewDid, reviewRkey] = reviewsMatch;
-		const subjectUri = `at://${decodeURIComponent(reviewDid)}/net.alternativeproto.submission/${decodeURIComponent(reviewRkey)}`;
+		const subjectUri = `at://${decodeURIComponent(reviewDid)}/${SUBMISSION_COLLECTION}/${decodeURIComponent(reviewRkey)}`;
 		try {
 			const reviews = await getReviewsForSubmission(subjectUri);
 			res.writeHead(200, {

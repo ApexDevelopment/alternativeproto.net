@@ -1,7 +1,9 @@
 import postgres from "postgres";
 import { Profanity } from "@2toad/profanity";
 
-const COLLECTION = "net.alternativeproto.submission";
+export const SUBMISSION_COLLECTION = "net.alternativeproto.submission";
+export const VOTE_COLLECTION = "net.alternativeproto.vote";
+export const REVIEW_COLLECTION = "net.alternativeproto.review";
 
 let _sql: ReturnType<typeof postgres> | null = null;
 
@@ -464,7 +466,7 @@ export async function backfillDid(
 		do {
 			const params = new URLSearchParams({
 				repo: did,
-				collection: COLLECTION,
+				collection: SUBMISSION_COLLECTION,
 				limit: "100",
 			});
 			if (cursor) params.set("cursor", cursor);
@@ -517,7 +519,7 @@ export async function backfillDid(
 		do {
 			const reviewParams = new URLSearchParams({
 				repo: did,
-				collection: REVIEW_COLLECTION_NAME,
+				collection: REVIEW_COLLECTION,
 				limit: "100",
 			});
 			if (reviewCursor) reviewParams.set("cursor", reviewCursor);
@@ -595,7 +597,7 @@ export async function backfillFromRelay(
 	try {
 		do {
 			const params = new URLSearchParams({
-				collection: COLLECTION,
+				collection: SUBMISSION_COLLECTION,
 				limit: "1000",
 			});
 			if (cursor) params.set("cursor", cursor);
@@ -628,7 +630,7 @@ export async function backfillFromRelay(
 				do {
 					const params = new URLSearchParams({
 						repo: did,
-						collection: COLLECTION,
+						collection: SUBMISSION_COLLECTION,
 						limit: "100",
 					});
 					if (recordCursor) params.set("cursor", recordCursor);
@@ -666,7 +668,6 @@ export async function backfillFromRelay(
 
 // ---------- Constellation (upvote counts) ----------
 
-const VOTE_COLLECTION = "net.alternativeproto.vote";
 const VOTE_PATH = ".subject.uri";
 const DEFAULT_CONSTELLATION_URL = "https://constellation.microcosm.blue";
 
@@ -762,7 +763,7 @@ export async function getAllSubmissionsRanked() {
 
 // ---------- Reviews ----------
 
-const REVIEW_COLLECTION_NAME = "net.alternativeproto.review";
+
 
 const profanity = new Profanity();
 
@@ -841,4 +842,4 @@ export async function getReviewsForSubmission(subjectUri: string): Promise<ApiRe
 	return reviews;
 }
 
-export { REVIEW_COLLECTION_NAME };
+
