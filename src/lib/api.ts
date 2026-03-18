@@ -166,32 +166,14 @@ async function uploadBlob(
 }
 
 async function fetchFavicon(projectUrl: string): Promise<Blob | null> {
-	let origin: string;
 	try {
-		origin = new URL(projectUrl).origin;
-	} catch {
-		return null;
-	}
-
-	const candidates = [
-		`${origin}/favicon.ico`,
-		`${origin}/favicon.png`,
-		`${origin}/apple-touch-icon.png`,
-	];
-
-	for (const url of candidates) {
-		try {
-			const response = await fetch(url, { mode: "cors" });
-			if (!response.ok) continue;
-			const contentType = response.headers.get("content-type");
-			if (contentType && contentType.startsWith("image/")) {
-				return await response.blob();
-			}
-		} catch {
-			continue;
+		const res = await fetch(`/api/favicon?url=${encodeURIComponent(projectUrl)}`);
+		if (!res.ok) return null;
+		const contentType = res.headers.get("content-type");
+		if (contentType && contentType.startsWith("image/")) {
+			return await res.blob();
 		}
-	}
-
+	} catch { /* ignore */ }
 	return null;
 }
 

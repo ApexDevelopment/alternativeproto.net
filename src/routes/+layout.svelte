@@ -132,6 +132,7 @@
 	<SubmitForm
 		onClose={() => { showSubmitForm = false; editSub = null; editingSubmission.set(null); }}
 		existingTags={existingTags}
+		existingSubmissions={submissions}
 		editSubmission={editSub ?? undefined}
 	/>
 {/if}

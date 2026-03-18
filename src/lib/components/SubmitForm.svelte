@@ -7,12 +7,16 @@
 	let {
 		onClose,
 		existingTags = [],
+		existingSubmissions = [],
 		editSubmission,
 	}: {
 		onClose: () => void;
 		existingTags?: string[];
+		existingSubmissions?: Submission[];
 		editSubmission?: Submission;
 	} = $props();
+
+	let duplicateWarning = $state("");
 
 	let isEdit = $derived(!!editSubmission);
 	let editRecord = $derived(editSubmission?.record);
@@ -176,8 +180,56 @@
 		}
 	}
 
+	function normalizeUrl(input: string): string {
+		let u = input.trim();
+		if (u && !/^https?:\/\//i.test(u)) {
+			u = "https://" + u;
+		}
+		return u;
+	}
+
+	/** Normalize a URL for comparison: lowercase, strip trailing slash, strip www. */
+	function urlForComparison(raw: string): string {
+		try {
+			const u = new URL(normalizeUrl(raw));
+			const host = u.hostname.replace(/^www\./i, "");
+			return (u.protocol + "//" + host + u.pathname.replace(/\/+$/, "") + u.search).toLowerCase();
+		} catch {
+			return raw.trim().toLowerCase().replace(/\/+$/, "");
+		}
+	}
+
+	function checkDuplicates() {
+		if (isEdit) { duplicateWarning = ""; return; }
+
+		const normalizedUrl = urlForComparison(url);
+		const trimmedName = name.trim().toLowerCase();
+		const warnings: string[] = [];
+
+		for (const s of existingSubmissions) {
+			if (urlForComparison(s.record.url) === normalizedUrl) {
+				warnings.push(`A submission with this URL already exists: "${s.record.name}"`);
+				break;
+			}
+		}
+
+		if (trimmedName) {
+			for (const s of existingSubmissions) {
+				if (s.record.name.toLowerCase() === trimmedName) {
+					warnings.push(`A submission with this name already exists: "${s.record.name}"`);
+					break;
+				}
+			}
+		}
+
+		duplicateWarning = warnings.join(" ");
+	}
+
 	async function handleSubmit(e: SubmitEvent) {
 		e.preventDefault();
+
+		// Normalize URL before validation/submission
+		url = normalizeUrl(url);
 
 		const hasExistingIcon = isEdit && !!editRecord?.icon;
 		if (!iconFile && !iconWarningShown && !hasExistingIcon) {
@@ -213,7 +265,7 @@
 			formMessage = result.message;
 			formMessageType = result.success ? "success" : "error";
 			await tick();
-			document.querySelector(".form-message")?.scrollIntoView({ behavior: "smooth", block: "center" });
+			document.getElementById("form-result")?.scrollIntoView({ behavior: "smooth", block: "center" });
 
 			if (result.success) {
 				setTimeout(closeModal, 2000);
@@ -228,7 +280,7 @@
 			formMessageType = "error";
 			submitting = false;
 			await tick();
-			document.querySelector(".form-message")?.scrollIntoView({ behavior: "smooth", block: "center" });
+			document.getElementById("form-result")?.scrollIntoView({ behavior: "smooth", block: "center" });
 		}
 	}
 </script>
@@ -258,6 +310,7 @@
 					bind:value={name}
 					required
 					placeholder="e.g., MyApp"
+					onblur={checkDuplicates}
 				/>
 			</div>
 
@@ -301,13 +354,20 @@
 			<div class="form-group">
 				<label for="project-url">Project URL *</label>
 				<input
-					type="url"
+					type="text"
 					id="project-url"
 					bind:value={url}
 					required
 					placeholder="https://example.com"
+					onblur={() => { url = normalizeUrl(url); checkDuplicates(); }}
 				/>
 			</div>
+
+			{#if duplicateWarning}
+				<div class="form-message error" style="margin-bottom: 1rem;">
+					{duplicateWarning}
+				</div>
+			{/if}
 
 			<div class="form-group">
 				<label for="project-alternative">Alternative To</label>
@@ -415,7 +475,7 @@
 			</div>
 
 			{#if formMessage}
-				<div class="form-message {formMessageType}">
+				<div id="form-result" class="form-message {formMessageType}">
 					{formMessage}
 				</div>
 			{/if}

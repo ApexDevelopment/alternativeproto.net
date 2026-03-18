@@ -755,10 +755,12 @@ export async function getAllSubmissionsRanked() {
 		}
 	}
 
-	return [...byUrl.values()].map(({ row, upvotes }) => ({
-		...dbRowToSubmission(row),
-		upvotes,
-	}));
+	return [...byUrl.values()]
+		.map(({ row, upvotes }) => ({
+			...dbRowToSubmission(row),
+			upvotes,
+		}))
+		.filter((s) => !!s.iconUrl);
 }
 
 // ---------- Reviews ----------

@@ -136,6 +136,61 @@ function backendPlugin(): Plugin {
 					return;
 				}
 
+				const faviconUrl = new URL(req.url || "/", "http://localhost");
+				if (faviconUrl.pathname === "/api/favicon" && req.method === "GET") {
+					const targetUrl = faviconUrl.searchParams.get("url");
+					if (!targetUrl) {
+						res.statusCode = 400;
+						res.end(JSON.stringify({ error: "Missing url parameter" }));
+						return;
+					}
+
+					let origin: string;
+					try {
+						const parsed = new URL(targetUrl);
+						if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+							res.statusCode = 400;
+							res.end("Invalid URL scheme");
+							return;
+						}
+						origin = parsed.origin;
+					} catch {
+						res.statusCode = 400;
+						res.end("Invalid URL");
+						return;
+					}
+
+					const candidates = [
+						`${origin}/favicon.ico`,
+						`${origin}/favicon.png`,
+						`${origin}/apple-touch-icon.png`,
+					];
+
+					for (const candidate of candidates) {
+						try {
+							const faviconRes = await fetch(candidate, {
+								headers: { "User-Agent": "alternativeproto/1.0 (+https://alternativeproto.net)" },
+								redirect: "follow",
+								signal: AbortSignal.timeout(5000),
+							});
+							if (!faviconRes.ok) continue;
+							const ct = faviconRes.headers.get("content-type");
+							if (!ct || !ct.startsWith("image/")) continue;
+							const data = Buffer.from(await faviconRes.arrayBuffer());
+							if (data.length === 0 || data.length > 1_000_000) continue;
+							res.setHeader("Content-Type", ct);
+							res.end(data);
+							return;
+						} catch {
+							continue;
+						}
+					}
+
+					res.statusCode = 404;
+					res.end("No favicon found");
+					return;
+				}
+
 				const blobMatch = url.pathname.match(
 					/^\/api\/blob\/([^/]+)\/([^/]+)$/,
 				);
