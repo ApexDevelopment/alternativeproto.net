@@ -36,6 +36,8 @@
 | `LABELER_DID` | DID of the labeler account (optional, enables labeler) |
 | `SIGNING_KEY` | Labeler signing key (required if `LABELER_DID` is set) |
 | `ADMIN_DID` | DID of the admin account whose upvotes apply `alternativeproto-verified` labels |
+| `RELAY_URL` | Relay HTTP endpoint for startup backfill (e.g. `https://bsky.network`) |
+| `CONSTELLATION_URL` | Constellation API endpoint for vote counting (default: `https://constellation.microcosm.blue`) |
 | `PORT` | Production server port (default: `3000`) |
 | `LABELER_PORT` | Labeler port (default: `14831`) |
 
