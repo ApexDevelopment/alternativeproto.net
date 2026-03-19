@@ -125,6 +125,7 @@
 				>AT Protocol</a
 			>
 			— Built by <a href="https://bsky.app/profile/apex.atproto.ceo" target="_blank" rel="noopener noreferrer">Apex</a>
+			— <a href="https://tangled.org/alternativeproto.net/alternativeproto.net" target="_blank" rel="noopener noreferrer">Source</a>
 		</p>
 	</div>
 </footer>
