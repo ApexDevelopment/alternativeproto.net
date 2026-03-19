@@ -15,6 +15,11 @@ import {
 	cacheSubmissionIcon,
 	upsertReview,
 	deleteReview,
+	blockUrl,
+	unblockUrl,
+	isUrlBlocked,
+	deleteSubmissionsByUrl,
+	getSubmissionByUri,
 	SUBMISSION_COLLECTION,
 	VOTE_COLLECTION,
 	REVIEW_COLLECTION,
@@ -22,6 +27,7 @@ import {
 import { getLabelerInstance } from "./labeler-util";
 
 const VERIFIED_LABEL = "alternativeproto-verified";
+const NOT_ATPROTO_LABEL = "alternativeproto-not-atproto";
 const CURSOR_SAVE_INTERVAL = 5000;
 
 let _started = false;
@@ -63,6 +69,20 @@ async function handleVote(
 		if (direction === "up") {
 			await labeler.createLabel({ val: VERIFIED_LABEL, uri: subject.uri });
 			console.log(`[jetstream] Applied ${VERIFIED_LABEL} to ${subject.uri}`);
+		} else if (direction === "down") {
+			await labeler.createLabel({ val: NOT_ATPROTO_LABEL, uri: subject.uri });
+			console.log(`[jetstream] Applied ${NOT_ATPROTO_LABEL} to ${subject.uri}`);
+
+			// Block the URL and purge all submissions with it
+			const sub = await getSubmissionByUri(subject.uri);
+			if (sub) {
+				const url = (sub.record as Record<string, unknown>).url as string | undefined;
+				if (url) {
+					await blockUrl(url);
+					await deleteSubmissionsByUrl(url);
+					console.log(`[jetstream] Blocked and purged submissions for URL: ${url}`);
+				}
+			}
 		}
 	} else if (operation === "delete") {
 		const vote = await getAdminVote(did, rkey);
@@ -73,6 +93,19 @@ async function handleVote(
 		if (vote.direction === "up") {
 			await labeler.createLabel({ val: VERIFIED_LABEL, uri: vote.subject_uri, neg: true });
 			console.log(`[jetstream] Negated ${VERIFIED_LABEL} on ${vote.subject_uri}`);
+		} else if (vote.direction === "down") {
+			await labeler.createLabel({ val: NOT_ATPROTO_LABEL, uri: vote.subject_uri, neg: true });
+			console.log(`[jetstream] Negated ${NOT_ATPROTO_LABEL} on ${vote.subject_uri}`);
+
+			// Unblock the URL so it can be re-indexed
+			const sub = await getSubmissionByUri(vote.subject_uri);
+			if (sub) {
+				const url = (sub.record as Record<string, unknown>).url as string | undefined;
+				if (url) {
+					await unblockUrl(url);
+					console.log(`[jetstream] Unblocked URL: ${url}`);
+				}
+			}
 		}
 	}
 }
@@ -190,8 +223,13 @@ export function startJetstream() {
 
 				if (collection === SUBMISSION_COLLECTION) {
 					const uri = `at://${did}/${SUBMISSION_COLLECTION}/${rkey}`;
-					if (operation === "create" || operation === "update") {
-						if (!record || !cid) return;
+				if (operation === "create" || operation === "update") {
+					if (!record || !cid) return;
+					const url = record.url as string | undefined;
+					if (url && await isUrlBlocked(url)) {
+						console.log(`[jetstream] Skipping blocked URL: ${url}`);
+						return;
+					}
 						try {
 							const { pds, handle } = await resolveIdentity(did);
 							await upsertSubmission(uri, did, rkey, cid, pds, handle, record, rev);

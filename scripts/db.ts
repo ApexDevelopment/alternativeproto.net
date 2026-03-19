@@ -82,6 +82,12 @@ export async function initDb() {
 		)
 	`;
 	await sql`CREATE INDEX IF NOT EXISTS idx_reviews_subject ON reviews(subject_uri)`;
+	await sql`
+		CREATE TABLE IF NOT EXISTS blocked_urls (
+			url TEXT PRIMARY KEY,
+			blocked_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+		)
+	`;
 }
 
 export interface DbSubmission {
@@ -153,6 +159,12 @@ export async function upsertSubmission(
 export async function deleteSubmission(uri: string) {
 	const sql = getSql();
 	await sql`DELETE FROM submissions WHERE uri = ${uri}`;
+}
+
+export async function getSubmissionByUri(uri: string): Promise<DbSubmission | null> {
+	const sql = getSql();
+	const rows = await sql<DbSubmission[]>`SELECT * FROM submissions WHERE uri = ${uri}`;
+	return rows[0] ?? null;
 }
 
 /**
@@ -268,6 +280,36 @@ export async function getAdminUpvotesForSubject(
 	return sql<{ did: string; rkey: string; subject_uri: string; direction: string }[]>`
 		SELECT did, rkey, subject_uri, direction FROM admin_votes
 		WHERE subject_uri = ${subjectUri} AND direction = 'up'
+	`;
+}
+
+// ---------- Blocked URLs (not-atproto) ----------
+
+export async function blockUrl(url: string) {
+	const sql = getSql();
+	await sql`
+		INSERT INTO blocked_urls (url) VALUES (${url})
+		ON CONFLICT DO NOTHING
+	`;
+}
+
+export async function unblockUrl(url: string) {
+	const sql = getSql();
+	await sql`DELETE FROM blocked_urls WHERE url = ${url}`;
+}
+
+export async function isUrlBlocked(url: string): Promise<boolean> {
+	const sql = getSql();
+	const rows = await sql`SELECT 1 FROM blocked_urls WHERE url = ${url}`;
+	return rows.length > 0;
+}
+
+/** Delete all submissions with the given URL */
+export async function deleteSubmissionsByUrl(url: string) {
+	const sql = getSql();
+	await sql`
+		DELETE FROM submissions
+		WHERE record->>'url' = ${url}
 	`;
 }
 
@@ -486,6 +528,10 @@ export async function backfillDid(
 			for (const item of data.records ?? []) {
 				const uri: string = item.uri;
 				const rkey = uri.split("/").pop()!;
+				const url = (item.value as Record<string, unknown>).url as string | undefined;
+				if (url && await isUrlBlocked(url)) {
+					continue;
+				}
 				await upsertSubmission(
 					uri,
 					did,
@@ -644,6 +690,8 @@ export async function backfillFromRelay(
 					for (const item of data.records ?? []) {
 						const uri: string = item.uri;
 						const rkey = uri.split("/").pop()!;
+						const url = (item.value as Record<string, unknown>).url as string | undefined;
+						if (url && await isUrlBlocked(url)) continue;
 						await upsertSubmission(uri, did, rkey, item.cid, pdsUrl, handle, item.value);
 						cacheSubmissionIcon(did, pdsUrl, item.value).catch(() => {});
 						if (onIndex) {
