@@ -148,27 +148,6 @@
 			<span class="tag">{tag}</span>
 		{/each}
 	</div>
-	<div class="project-links">
-		{#if canClaim}
-			<button
-				class="btn btn-claim"
-				class:btn-claim-success={claimState === "claimed"}
-				class:btn-claim-error={claimState === "error"}
-				onclick={(e: MouseEvent) => { e.stopPropagation(); handleClaim(); }}
-				disabled={claimState === "claiming" || claimState === "claimed"}
-			>
-				{#if claimState === "claiming"}
-					<LoaderCircle size={14} strokeWidth={2.5} class="spinning" />
-				{:else if claimState === "claimed"}
-					<Check size={14} strokeWidth={2.5} /> Claimed
-				{:else if claimState === "error"}
-					<ShieldCheck size={14} strokeWidth={2.5} /> Retry
-				{:else}
-					<ShieldCheck size={14} strokeWidth={2.5} /> Claim Project
-				{/if}
-			</button>
-		{/if}
-	</div>
 	<div class="project-hover-links">
 		<a
 			href={safeHref(r.url)}
@@ -187,6 +166,25 @@
 			>
 				<Code size={14} strokeWidth={2.5} /> Source
 			</a>
+		{/if}
+		{#if canClaim}
+			<button
+				class="btn btn-claim"
+				class:btn-claim-success={claimState === "claimed"}
+				class:btn-claim-error={claimState === "error"}
+				onclick={(e: MouseEvent) => { e.stopPropagation(); handleClaim(); }}
+				disabled={claimState === "claiming" || claimState === "claimed"}
+			>
+				{#if claimState === "claiming"}
+					<LoaderCircle size={14} strokeWidth={2.5} class="spinning" />
+				{:else if claimState === "claimed"}
+					<Check size={14} strokeWidth={2.5} /> Claimed
+				{:else if claimState === "error"}
+					<ShieldCheck size={14} strokeWidth={2.5} /> Retry
+				{:else}
+					<ShieldCheck size={14} strokeWidth={2.5} /> Claim Project
+				{/if}
+			</button>
 		{/if}
 		{#if canEdit && onEdit}
 			<button
