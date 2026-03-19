@@ -195,7 +195,7 @@
 					rel="noopener noreferrer"
 					class="btn btn-secondary"
 				>
-					<Code size={16} strokeWidth={2.5} /> View Source
+					<Code size={16} strokeWidth={2.5} /> Source
 				</a>
 			{/if}
 			{#if canClaim}

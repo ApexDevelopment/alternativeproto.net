@@ -149,24 +149,6 @@
 		{/each}
 	</div>
 	<div class="project-links">
-		<a
-			href={safeHref(r.url)}
-			target="_blank"
-			rel="noopener noreferrer"
-			class="btn btn-primary"
-		>
-			Visit Site <ExternalLink size={14} strokeWidth={2.5} />
-		</a>
-		{#if r.isOpenSource && r.repositoryUrl}
-			<a
-				href={safeHref(r.repositoryUrl)}
-				target="_blank"
-				rel="noopener noreferrer"
-				class="btn btn-secondary"
-			>
-				<Code size={14} strokeWidth={2.5} /> View Source
-			</a>
-		{/if}
 		{#if canClaim}
 			<button
 				class="btn btn-claim"
@@ -185,6 +167,26 @@
 					<ShieldCheck size={14} strokeWidth={2.5} /> Claim Project
 				{/if}
 			</button>
+		{/if}
+	</div>
+	<div class="project-hover-links">
+		<a
+			href={safeHref(r.url)}
+			target="_blank"
+			rel="noopener noreferrer"
+			class="btn btn-primary"
+		>
+			Visit <ExternalLink size={14} strokeWidth={2.5} />
+		</a>
+		{#if r.isOpenSource && r.repositoryUrl}
+			<a
+				href={safeHref(r.repositoryUrl)}
+				target="_blank"
+				rel="noopener noreferrer"
+				class="btn btn-secondary"
+			>
+				<Code size={14} strokeWidth={2.5} /> Source
+			</a>
 		{/if}
 		{#if canEdit && onEdit}
 			<button
