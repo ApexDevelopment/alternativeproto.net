@@ -91,15 +91,16 @@
 		aria-label="View {r.name} details"
 	>
 		<div class="project-header">
-			<div class="project-icon">
-				{#if submission.iconUrl}
+			{#if submission.iconUrl}
+				<div class="project-icon">
 					<img
 						src={submission.iconUrl}
 						alt="{r.name} icon"
 						class="project-icon-img"
+						onerror={(e: Event) => { (e.currentTarget as HTMLElement).parentElement!.style.display = 'none'; }}
 					/>
-				{/if}
-			</div>
+				</div>
+			{/if}
 			<div class="project-title-group">
 				<h3 class="project-name">
 					{r.name}<!--
