@@ -34,3 +34,6 @@ labels.db-wal
 # SvelteKit
 .svelte-kit
 build
+
+# Irrelevant Docker compose files
+compose.*.yml
